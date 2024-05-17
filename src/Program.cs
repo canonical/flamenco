@@ -46,23 +46,8 @@ public class Program
     private static RootCommand BuildRootCommand()
     {
         var rootCommand = new RootCommand(description: "Provides tooling for maintainers of .NET Ubuntu packages.");
-
-        var sourceDirectoryOption = new Option<DirectoryInfo>(
-            name: "--source-directory",
-            description: "The directory that the build tool uses to produce its targets.",
-            getDefaultValue: () => new DirectoryInfo("src"));
+        rootCommand.AddCommand(new BuildCommand());
         
-        var destinantionDirectoryOption = new Option<DirectoryInfo>(
-            name: "--destination-directory",
-            description: "The directory where the targets are build.",
-            getDefaultValue: () => new DirectoryInfo("dist"));
-        
-        var buildCommand = new Command(name: "build", description: "");
-        buildCommand.AddGlobalOption(sourceDirectoryOption);
-        buildCommand.AddGlobalOption(destinantionDirectoryOption);
-        buildCommand.AddCommand(BuildDebianTarballCommand.BuildCommand());
-        rootCommand.AddCommand(buildCommand);
-
         return rootCommand;
     }
 }

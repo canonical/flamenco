@@ -3,26 +3,20 @@ using System.CommandLine.NamingConventionBinder;
 
 namespace Flamenco.Commands;
 
-public static class BuildDebianTarballCommand
+public class BuildDebianTarballCommand : Command
 {
-    public static Command BuildCommand()
+    public BuildDebianTarballCommand() : base(name: "debian-tarball", description: "")
     {
-        var buildDebianTarballCommand = new Command(name: "debian-tarball", description: "")
-        {
-            Handler = CommandHandler.Create(Run),
-        };
-
         var targetArguments = new Argument<string[]>(name: "targets", description: "")
         {
             Arity = ArgumentArity.ZeroOrMore,
         };
 
-        buildDebianTarballCommand.AddArgument(targetArguments);
-
-        return buildDebianTarballCommand;
+        AddArgument(targetArguments);
+        Handler = CommandHandler.Create(Run);
     }
     
-    public static async Task<int> Run(
+    private static async Task<int> Run(
         string[] targets, 
         DirectoryInfo sourceDirectory,
         DirectoryInfo destinationDirectory,
