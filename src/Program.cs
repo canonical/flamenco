@@ -5,32 +5,6 @@ namespace Flamenco;
 
 public class Program
 {
-    public static async Task<int> BuildDebianTarball(
-        string[] targets,
-        CancellationToken cancellationToken = default)
-    {
-        Console.WriteLine($"Build debian tarball for:");
-        foreach (var target in targets)
-        {
-            Console.WriteLine($"{target}");
-        }
-        
-        return 0;
-    }
-    
-    public static async Task<int> BuildOrigTarball(
-        string[] targets,
-        CancellationToken cancellationToken = default)
-    {
-        Console.WriteLine($"Build orig tarball for:");
-        foreach (var sourcePackageName in targets)
-        {
-            Console.WriteLine($"{sourcePackageName}");
-        }
-        
-        return 0;
-    }
-    
     public static Task<int> Main(string[] args)
     {
         try
