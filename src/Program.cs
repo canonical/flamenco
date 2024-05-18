@@ -3,7 +3,7 @@ using Flamenco.Commands;
 
 namespace Flamenco;
 
-public class Program
+public static class Program
 {
     public static Task<int> Main(string[] args)
     {
