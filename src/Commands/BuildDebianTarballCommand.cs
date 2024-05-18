@@ -5,9 +5,15 @@ namespace Flamenco.Commands;
 
 public class BuildDebianTarballCommand : Command
 {
-    public BuildDebianTarballCommand() : base(name: "debian-tarball", description: "")
+    public BuildDebianTarballCommand() : base(
+        name: "debian-tarball", 
+        description: "Builds the debian tarball(s) for specific packages and series from a provided source directory.")
     {
-        var targetArguments = new Argument<string[]>(name: "targets", description: "")
+        var targetArguments = new Argument<string[]>(
+            name: "targets", 
+            description: "The build targets that should be produced. A build target is in the " +
+                         "format 'PACKAGE:SERIES' (e.g. 'dotnet8:noble'). If no build target " +
+                         "is specified all buildable targets in the source directory will be selected.")
         {
             Arity = ArgumentArity.ZeroOrMore,
         };
