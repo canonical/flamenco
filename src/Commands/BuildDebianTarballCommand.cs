@@ -13,6 +13,8 @@ public class BuildDebianTarballCommand : Command
         };
 
         AddArgument(targetArguments);
+        AddOption(CommonOptions.SourceDirectoryOption);
+        AddOption(CommonOptions.DestinationDirectoryOption);
         Handler = CommandHandler.Create(Run);
     }
     
