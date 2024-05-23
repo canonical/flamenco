@@ -1,0 +1,61 @@
+name: flamenco
+base: core22
+summary: Package maintenance tool for Ubuntu Toolchains
+description: |
+  Flamenco is a CLI tool that helps toolchain developers manage many
+  different package versions and releases from a single debian
+  folder source tree.
+adopt-info: flamenco
+
+grade: devel
+confinement: strict
+
+architectures:
+  - build-on: [amd64, arm64]
+    build-for: [amd64]
+  - build-on: [amd64, arm64]
+    build-for: [arm64]
+
+parts:
+  flamenco:
+    source: .
+    plugin: nil
+    build-packages:
+      - dotnet-sdk-8.0
+    stage-packages:
+      - libicu70
+      - liblttng-ust1
+    override-build: |
+      /usr/bin/dotnet --info
+
+      if [ "${CRAFT_ARCH_BUILD_FOR}" = "amd64" ]; then
+        RUNTIME_RID="linux-x64"
+      elif [ "${CRAFT_ARCH_BUILD_FOR}" = "arm64" ]; then
+        RUNTIME_RID="linux-arm64"
+      else
+        echo "Unknown architecture (${CRAFT_ARCH_BUILD_FOR})"
+        exit 1
+      fi
+
+      /usr/bin/dotnet publish src --output "${SNAPCRAFT_PART_INSTALL}" --configuration Release \
+        -r "${RUNTIME_RID}" -p:DebugSymbols=false -p:DebugType=none
+      chmod 555 "${SNAPCRAFT_PART_INSTALL}/Flamenco"
+
+      FLAMENCO_VERSION=$(cat src/Flamenco.csproj | grep \<Version\> | awk -F'[<>]' '{print $3}')
+      craftctl set version="${FLAMENCO_VERSION}+git.$(git rev-parse --short HEAD)"
+      craftctl default
+    organize:
+      Flamenco: usr/bin/flamenco
+
+apps:
+  flamenco:
+    command: usr/bin/flamenco
+    plugs:
+      - home
+
+lint:
+  ignore: 
+    - library:
+      - libicu*
+      - liblttng-ust-*
+      - libcoreclrtraceptprovider.so
