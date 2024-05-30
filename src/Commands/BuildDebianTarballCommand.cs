@@ -32,6 +32,13 @@ public class BuildDebianTarballCommand : Command
     {
         Log.Debug("Source Directory: " + sourceDirectory.FullName);
         Log.Debug("Destination Directory: " + destinationDirectory.FullName);
+
+        if (!(Program.IsPathAccessible(sourceDirectory.FullName) && 
+            Program.IsPathAccessible(destinationDirectory.FullName)))
+        {
+            Log.Fatal("Aborting the build process, because some paths are not accessible.");
+            return -1;
+        }
         
         var sourceDirectoryInfo = SourceDirectoryInfo.FromDirectory(sourceDirectory);
         if (sourceDirectoryInfo is null)
