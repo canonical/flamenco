@@ -1,7 +1,7 @@
 using System.Collections.Immutable;
 using System.Text;
 
-namespace Flamenco;
+namespace Flamenco.Packaging;
 
 public record BuildTarget(string PackageName, string SeriesName)
 {

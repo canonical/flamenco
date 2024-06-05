@@ -1,6 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 
-namespace Flamenco;
+namespace Flamenco.Packaging;
 
 public class DebianTarballBuilder
 {

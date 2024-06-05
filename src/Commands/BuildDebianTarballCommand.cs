@@ -1,5 +1,6 @@
 using System.CommandLine;
 using System.CommandLine.NamingConventionBinder;
+using Flamenco.Packaging;
 
 namespace Flamenco.Commands;
 
