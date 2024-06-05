@@ -27,10 +27,16 @@ public class BuildDebianTarballCommand : Command
     
     private static async Task<int> Run(
         string[] targets, 
-        DirectoryInfo sourceDirectory,
-        DirectoryInfo destinationDirectory,
+        DirectoryInfo? sourceDirectory,
+        DirectoryInfo? destinationDirectory,
         CancellationToken cancellationToken = default)
     {
+        if (!EnvironmentVariables.TryGetSourceDirectoryInfoFromEnvironmentOrDefaultIfNull(ref sourceDirectory) ||
+            !EnvironmentVariables.TryGetDestinationDirectoryInfoFromEnvironmentOrDefaultIfNull(ref destinationDirectory)) 
+        {
+            return -1;
+        }
+        
         Log.Debug("Source Directory: " + sourceDirectory.FullName);
         Log.Debug("Destination Directory: " + destinationDirectory.FullName);
 
