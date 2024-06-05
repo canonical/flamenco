@@ -25,6 +25,8 @@ parts:
     stage-packages:
       - libicu70
       - liblttng-ust1
+      - tar
+      - xz-utils
     override-build: |
       /usr/bin/dotnet --info
 
