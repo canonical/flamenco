@@ -19,4 +19,11 @@ public static class CommonOptions
         {
             Arity = ArgumentArity.ExactlyOne,
         };
+    
+    public static readonly Option<Tarball.CompressionMethod> DebianTarballCompressionMethod = new (
+        name: "--debian-tarball-compression-method",
+        description: "The compression method used to create debian tar archives.")
+    {
+        Arity = ArgumentArity.ExactlyOne,
+    };
 }

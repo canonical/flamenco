@@ -29,10 +29,12 @@ public class BuildDebianTarballCommand : Command
         string[] targets, 
         DirectoryInfo? sourceDirectory,
         DirectoryInfo? destinationDirectory,
+        Tarball.CompressionMethod? debianTarballCompressionMethod,
         CancellationToken cancellationToken = default)
     {
         if (!EnvironmentVariables.TryGetSourceDirectoryInfoFromEnvironmentOrDefaultIfNull(ref sourceDirectory) ||
-            !EnvironmentVariables.TryGetDestinationDirectoryInfoFromEnvironmentOrDefaultIfNull(ref destinationDirectory)) 
+            !EnvironmentVariables.TryGetDestinationDirectoryInfoFromEnvironmentOrDefaultIfNull(ref destinationDirectory) ||
+            !EnvironmentVariables.TryGetDebianTarballCompressionMethodFromEnvironmentOrDefaultIfNull(ref debianTarballCompressionMethod)) 
         {
             return -1;
         }
@@ -78,7 +80,7 @@ public class BuildDebianTarballCommand : Command
         {
             SourceDirectory = sourceDirectoryInfo,
             DestinationDirectory = destinationDirectory,
-            TarballCompressionMethod = Tarball.CompressionMethod.XZ,
+            TarballCompressionMethod = debianTarballCompressionMethod.Value,
             BuildTarget = null!
         };
         
