@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using Flamenco.Packaging.Dpkg;
 
 namespace Flamenco.Packaging;
 
@@ -9,21 +10,98 @@ public class DebianTarballBuilder
     
     public required DirectoryInfo DestinationDirectory { get; set; }
     
-    public async Task<bool> BuildDebianDirectoryAsync(CancellationToken cancellationToken = default)
+    public required Tarball.CompressionMethod TarballCompressionMethod { get; set; }
+    
+    public async Task<bool> BuildDebianTarballAsync(CancellationToken cancellationToken = default)
     {
-        return await ProcessDirectoryAsync(
-            sourceDirectory: SourceDirectory.DirectoryInfo, 
-            destinationDirectory: DestinationDirectory,
-            cancellationToken);
+        var changelogEntry = await ReadFirstChangelogEntryAsync(cancellationToken)
+                            .ConfigureAwait(continueOnCapturedContext: false);
+
+        if (changelogEntry is null) return false;
+
+        if (changelogEntry.PackageName != BuildTarget.PackageName)
+        {
+            Log.Warning($"Package name of in first changelog entry does not match with the the build target {BuildTarget}.");
+        }
+        
+        var destinationDirectory = new DirectoryInfo(Path.Combine(
+            DestinationDirectory.FullName,
+            BuildTarget.SeriesName,
+            $"{BuildTarget.PackageName}-{changelogEntry.Version}", 
+            "debian"));
+
+        if (!await RecursivelyCopyMatchingFilesAsync(
+                    sourceDirectory: SourceDirectory.DirectoryInfo,
+                    destinationDirectory: destinationDirectory,
+                    cancellationToken)
+                .ConfigureAwait(continueOnCapturedContext: false))
+        {
+            return false;
+        }
+
+        try
+        {
+            var tarballExtension = $".tar{Tarball.CompressionMethodExtension(TarballCompressionMethod)}";
+            
+            await Tarball.CreateTarArchiveAsync(
+                archiveFile: new FileInfo(fileName: Path.Combine(
+                    DestinationDirectory.FullName,
+                    BuildTarget.SeriesName,
+                    $"{BuildTarget.PackageName}_{changelogEntry.Version}.debian{tarballExtension}")),
+                archiveRoot: destinationDirectory.Parent!, // the steps before should ensure that the parent directory exists
+                includedPaths: new [] { "debian" },
+                TarballCompressionMethod,
+                cancellationToken);
+            
+            return true;
+        }
+        catch (Exception exception)
+        {
+            Log.Error(exception.Message);
+            return false;
+        }
     }
 
-    private async Task<bool> ProcessDirectoryAsync(
+    private async Task<ChangelogEntry?> ReadFirstChangelogEntryAsync(CancellationToken cancellationToken)
+    {
+        using var changelog = SourceDirectory.ReadChangelog(BuildTarget);
+
+        if (changelog is null) return null;
+
+        try
+        {
+            var changelogEntry = await changelog
+                .ReadChangelogEntryAsync(cancellationToken)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+            if (changelogEntry is null) Log.Error($"Empty changelog file for {BuildTarget}.");    
+
+            return changelogEntry;
+        }
+        catch (FormatException exception)
+        {
+            Log.Error($"Malformed changelog file. Can't read the first changelog entry for {BuildTarget}.");
+            Log.Debug(exception.Message);
+        }
+        catch (IOException exception)
+        {
+            Log.Error($"An I/O error occured why trying to read the first changelog entry for {BuildTarget}.");
+            Log.Debug(exception.Message);
+        }
+        catch (Exception exception)
+        {
+            Log.Error($"An unexpected error occured why trying to read the first changelog entry for {BuildTarget}.");
+            Log.Debug(exception.Message);
+        }
+
+        return null;
+    }
+
+    private async Task<bool> RecursivelyCopyMatchingFilesAsync(
         DirectoryInfo sourceDirectory,
         DirectoryInfo destinationDirectory,
         CancellationToken cancellationToken = default)
     {
-        // TODO: rename this method. "process" is a term that is to generic.
-        
         bool errorDetected = false;
         var destinationFiles = new Dictionary<string, (FileInfo Info, int BuildTargetSpecificity)>();
         
@@ -107,13 +185,13 @@ public class DebianTarballBuilder
         {
             var destinationSubDirectoryPath = Path.Combine(destinationDirectory.FullName, sourceSubDirectory.Name);
                 
-            tasks.Add(ProcessDirectoryAsync(
+            tasks.Add(RecursivelyCopyMatchingFilesAsync(
                 sourceDirectory: sourceSubDirectory, 
                 destinationDirectory: new DirectoryInfo(destinationSubDirectoryPath), 
                 cancellationToken));
         }
 
-        foreach (var result in await Task.WhenAll(tasks))
+        foreach (var result in await Task.WhenAll(tasks).ConfigureAwait(continueOnCapturedContext: false))
         {
             errorDetected = errorDetected && result;
         }

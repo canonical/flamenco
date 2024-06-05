@@ -1,5 +1,5 @@
-using System.Collections.Immutable;
-using System.Text;
+using System.Security;
+using Flamenco.Packaging.Dpkg;
 
 namespace Flamenco.Packaging;
 
@@ -47,7 +47,7 @@ public class SourceDirectoryInfo
 
         return targetCollection;
     }
-
+    
     private SourceDirectoryInfo(
         DirectoryInfo directoryInfo,
         BuildTargetCollection buildableTargets)
@@ -59,4 +59,39 @@ public class SourceDirectoryInfo
     public DirectoryInfo DirectoryInfo { get; }
     
     public BuildTargetCollection BuildableTargets { get; }
+
+    public DpkgChangelogReader? ReadChangelog(BuildTarget buildTarget)
+    {
+        var path = Path.Combine(
+            DirectoryInfo.FullName,
+            $"changelog.{buildTarget.PackageName}.{buildTarget.SeriesName}");
+
+        try
+        {
+            return DpkgChangelogReader.FromFile(path);
+        }
+        catch (Exception exception)
+        {
+            switch (exception)
+            {
+                case FileNotFoundException or DirectoryNotFoundException:
+                    Log.Error(message: $"Could not find file '{path}'.");
+                    break;
+                case UnauthorizedAccessException or SecurityException:
+                    Log.Error(message: $"Permissions denied to access file '{path}'.");
+                    Log.Debug(exception.Message);
+                    break;
+                case IOException:
+                    Log.Error(message: $"Permissions denied to access file '{path}'.");
+                    Log.Debug(exception.Message);
+                    break;
+                default:
+                    Log.Error(message: "An unexpected error occured.");
+                    Log.Debug(message: $"{exception.GetType().FullName}: {exception.Message}");
+                    break;
+            }
+
+            return null;
+        }
+    }
 }

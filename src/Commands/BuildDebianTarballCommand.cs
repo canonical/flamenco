@@ -71,10 +71,11 @@ public class BuildDebianTarballCommand : Command
         var debianTarballBuilder = new DebianTarballBuilder()
         {
             SourceDirectory = sourceDirectoryInfo,
-            DestinationDirectory = null!,
+            DestinationDirectory = destinationDirectory,
+            TarballCompressionMethod = Tarball.CompressionMethod.XZ,
             BuildTarget = null!
         };
-
+        
         int failedBuilds = 0;
 
         if (!destinationDirectory.Exists)
@@ -85,12 +86,8 @@ public class BuildDebianTarballCommand : Command
         foreach (var buildTarget in buildTargets)
         {
             debianTarballBuilder.BuildTarget = buildTarget;
-            debianTarballBuilder.DestinationDirectory = new DirectoryInfo(
-                Path.Combine(
-                    destinationDirectory.FullName,
-                    $"{buildTarget.PackageName}-{buildTarget.SeriesName}"));
             
-            if (await debianTarballBuilder.BuildDebianDirectoryAsync(cancellationToken))
+            if (await debianTarballBuilder.BuildDebianTarballAsync(cancellationToken))
             {
                 Log.Info($"Building target {buildTarget} succeeded.");    
             }
