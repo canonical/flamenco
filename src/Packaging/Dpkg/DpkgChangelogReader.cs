@@ -102,7 +102,7 @@ public sealed class DpkgChangelogReader(TextReader textReader) : IDisposable
     
     private record struct ChangelogEntryTitle(
         string PackageName,
-        DebVersion Version,
+        DpkgVersion Version,
         ImmutableArray<string> Distributions,
         ImmutableDictionary<string, string> Metadata)
     {
@@ -120,11 +120,11 @@ public sealed class DpkgChangelogReader(TextReader textReader) : IDisposable
                                           "format does not match the format detailed in man page deb-changelog(5).");
             }
 
-            DebVersion version;
+            DpkgVersion version;
 
             try
             {
-                version = DebVersion.Parse(match.Groups["Version"].Value);
+                version = DpkgVersion.Parse(match.Groups["Version"].Value);
             }
             catch (Exception exception)
             {
@@ -200,7 +200,7 @@ public record struct MaintainerInfo(string Name, string EmailAddress);
 
 public record ChangelogEntry(
     string PackageName,
-    DebVersion Version,
+    DpkgVersion Version,
     ImmutableArray<string> Distributions,
     ImmutableDictionary<string, string> Metadata,
     MaintainerInfo Maintainer,

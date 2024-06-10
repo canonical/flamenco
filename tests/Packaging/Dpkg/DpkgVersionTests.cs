@@ -4,34 +4,34 @@ using Flamenco.Packaging.Dpkg;
 
 namespace Flamenco.Packaging.Dpkg;
 
-public class DebVersionTests
+public class DpkgVersionTests
 {
     [Fact]
     public void ToStringOf_EmptyDebVersion_Returns_EmptyString()
     {
-        Assert.Equal(expected: string.Empty, actual: DebVersion.Empty.ToString());
-        Assert.Null(DebVersion.Empty.Epoch);
-        Assert.Equal(expected: 0u, actual: DebVersion.Empty.EpochValue);
-        Assert.Equal(expected: string.Empty, actual: DebVersion.Empty.UpstreamVersion);
-        Assert.Equal(expected: string.Empty, actual: DebVersion.Empty.EffectiveUpstreamVersion);
-        Assert.Null(DebVersion.Empty.RevertedUpstreamVersion);
-        Assert.Null(DebVersion.Empty.RealUpstreamVersion);
-        Assert.Null(DebVersion.Empty.Revision);
-        Assert.Null(DebVersion.Empty.DebianRevision);
-        Assert.Null(DebVersion.Empty.UbuntuRevision);
+        Assert.Equal(expected: string.Empty, actual: DpkgVersion.Empty.ToString());
+        Assert.Null(DpkgVersion.Empty.Epoch);
+        Assert.Equal(expected: 0u, actual: DpkgVersion.Empty.EpochValue);
+        Assert.Equal(expected: string.Empty, actual: DpkgVersion.Empty.UpstreamVersion);
+        Assert.Equal(expected: string.Empty, actual: DpkgVersion.Empty.EffectiveUpstreamVersion);
+        Assert.Null(DpkgVersion.Empty.RevertedUpstreamVersion);
+        Assert.Null(DpkgVersion.Empty.RealUpstreamVersion);
+        Assert.Null(DpkgVersion.Empty.Revision);
+        Assert.Null(DpkgVersion.Empty.DebianRevision);
+        Assert.Null(DpkgVersion.Empty.UbuntuRevision);
     }
     
     [Fact]
     public void Parsing_EmptyString_Works()
     {
-        DebVersion.Parse(string.Empty);
+        DpkgVersion.Parse(string.Empty);
     }
     
     [Theory]
     [InlineData("a:1")]
     public void Parsing_InvalidVersionString_Fails(string invalidVersionString)
     {
-        Assert.Throws<FormatException>(testCode: () => DebVersion.Parse(invalidVersionString));
+        Assert.Throws<FormatException>(testCode: () => DpkgVersion.Parse(invalidVersionString));
     }
     
      [Theory]
@@ -75,7 +75,7 @@ public class DebVersionTests
          string? expectedDebianRevision,
          string? expectedUbuntuRevision)
      {
-         var debVersion = DebVersion.Parse(validVersionString);
+         var debVersion = DpkgVersion.Parse(validVersionString);
          
          Assert.Equal(expected: expectedEpoch, actual: debVersion.Epoch);
          Assert.Equal(expected: expectedEpochValue, actual: debVersion.EpochValue);
@@ -95,8 +95,8 @@ public class DebVersionTests
      [InlineData("0:0", "0")]
      public void VersionA_Equals_VersionB(string a, string b)
      {
-         var alpha = DebVersion.Parse(a);
-         var beta = DebVersion.Parse(b);
+         var alpha = DpkgVersion.Parse(a);
+         var beta = DpkgVersion.Parse(b);
          
          Assert.Equal(expected: 0, actual: alpha.CompareTo((object?)beta));
          Assert.Equal(expected: 0, actual: alpha.CompareTo(beta));
@@ -127,8 +127,8 @@ public class DebVersionTests
      [InlineData("1:1", "2")]
      public void VersionA_IsGreaterThan_VersionB(string a, string b)
      {
-         var alpha = DebVersion.Parse(a);
-         var beta = DebVersion.Parse(b);
+         var alpha = DpkgVersion.Parse(a);
+         var beta = DpkgVersion.Parse(b);
          
          Assert.Equal(expected: 1, actual: alpha.CompareTo((object?)beta));
          Assert.Equal(expected: 1, actual: alpha.CompareTo(beta));
@@ -163,26 +163,26 @@ public class DebVersionTests
      [InlineData("1:1-1ubuntu1")]
      public void Null_IsLessThan_AnyDebVersion(string version)
      {
-         DebVersion debVersion = DebVersion.Parse(version);
-         Assert.True(null < debVersion);
+         DpkgVersion dpkgVersion = DpkgVersion.Parse(version);
+         Assert.True(null < dpkgVersion);
          
-         Assert.Equal(expected: 1, actual: debVersion.CompareTo((object?)null));
-         Assert.Equal(expected: 1, actual: debVersion.CompareTo((DebVersion?)null));
+         Assert.Equal(expected: 1, actual: dpkgVersion.CompareTo((object?)null));
+         Assert.Equal(expected: 1, actual: dpkgVersion.CompareTo((DpkgVersion?)null));
          
-         Assert.False(debVersion.Equals(null));
-         Assert.False(debVersion == null);
-         Assert.True(debVersion != null);
+         Assert.False(dpkgVersion.Equals(null));
+         Assert.False(dpkgVersion == null);
+         Assert.True(dpkgVersion != null);
                  
-         Assert.False(debVersion < null);
-         Assert.False(debVersion <= null);
-         Assert.True(debVersion > null);
-         Assert.True(debVersion >= null);
+         Assert.False(dpkgVersion < null);
+         Assert.False(dpkgVersion <= null);
+         Assert.True(dpkgVersion > null);
+         Assert.True(dpkgVersion >= null);
      }
      
      [Fact]
      public void Sort()
      {
-         var versions = new [] { DebVersion.Parse("2"), null, DebVersion.Parse("1"), DebVersion.Parse("3"), null };
+         var versions = new [] { DpkgVersion.Parse("2"), null, DpkgVersion.Parse("1"), DpkgVersion.Parse("3"), null };
          
          Array.Sort(versions);
          

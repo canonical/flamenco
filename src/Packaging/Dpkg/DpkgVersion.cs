@@ -7,11 +7,11 @@ namespace Flamenco.Packaging.Dpkg;
 /// A representation of the Debian/Ubuntu package version format, as defined in the man page
 /// <see href="https://manpages.ubuntu.com/manpages/noble/en/man7/deb-version.7.html">deb-version(7)</see>.
 /// </summary>
-public class DebVersion : 
+public class DpkgVersion : 
     IComparable,
-    IComparable<DebVersion>,
-    IEquatable<DebVersion>,
-    ISpanParsable<DebVersion>
+    IComparable<DpkgVersion>,
+    IEquatable<DpkgVersion>,
+    ISpanParsable<DpkgVersion>
 {
     /// <summary>
     /// The character that indicates the boundary between the epoch and remaining deb version string representation.  
@@ -42,9 +42,9 @@ public class DebVersion :
     public const uint DefaultEpochValue = 0;
 
     /// <summary>
-    /// An <see cref="DebVersion"/> instance with an empty string representation.
+    /// An <see cref="DpkgVersion"/> instance with an empty string representation.
     /// </summary>
-    public static readonly DebVersion Empty = new DebVersion(
+    public static readonly DpkgVersion Empty = new DpkgVersion(
         epoch: null, 
         upstreamVersion: string.Empty, 
         revertedUpstreamVersion: null, 
@@ -54,7 +54,7 @@ public class DebVersion :
         ubuntuRevision: null);
     
     /// <summary>
-    /// Initializes a new <see cref="DebVersion"/> instance using the values provided for initialization. 
+    /// Initializes a new <see cref="DpkgVersion"/> instance using the values provided for initialization. 
     /// </summary>
     /// <remarks>
     /// The values provided for initialization are not validated.
@@ -67,7 +67,7 @@ public class DebVersion :
     /// <param name="revision">Value used for the initialization of <see cref="Revision"/>.</param>
     /// <param name="debianRevision">Value used for the initialization of <see cref="DebianRevision"/>.</param>
     /// <param name="ubuntuRevision">Value used for the initialization of <see cref="UbuntuRevision"/>.</param>
-    protected DebVersion(
+    protected DpkgVersion(
         string? epoch,
         string upstreamVersion,
         string? revertedUpstreamVersion,
@@ -201,38 +201,38 @@ public class DebVersion :
     /// <inheritdoc cref="Object.Equals(object?)"/>
     public override bool Equals(object? other) => other switch 
     {
-        DebVersion debVersion => Equals(debVersion),
+        DpkgVersion debVersion => Equals(debVersion),
         _ => false
     };
 
     /// <inheritdoc cref="IEquatable{T}.Equals(T?)"/>
-    public bool Equals(DebVersion? other) => CompareTo(other) == 0;
+    public bool Equals(DpkgVersion? other) => CompareTo(other) == 0;
 
     /// <summary>
-    /// Indicates whether the two <see cref="DebVersion"/> instances are equal to each other.
+    /// Indicates whether the two <see cref="DpkgVersion"/> instances are equal to each other.
     /// </summary>
-    /// <param name="a">The first <see cref="DebVersion"/> instance to compare with <paramref name="b"/>.</param>
-    /// <param name="b">The second <see cref="DebVersion"/> instance to compare with <paramref name="a"/>.</param>
+    /// <param name="a">The first <see cref="DpkgVersion"/> instance to compare with <paramref name="b"/>.</param>
+    /// <param name="b">The second <see cref="DpkgVersion"/> instance to compare with <paramref name="a"/>.</param>
     /// <returns>
     /// <see langword="true"/> if <paramref name="a"/> is equal to <paramref name="b"/>;
     /// otherwise <see langword="false"/>.
     /// </returns>
-    public static bool operator ==(DebVersion? a, DebVersion? b)
+    public static bool operator ==(DpkgVersion? a, DpkgVersion? b)
     {
         if (a is null) return b is null;
         return a.Equals(b);
     }
         
     /// <summary>
-    /// Indicates whether the two <see cref="DebVersion"/> instances are not equal to each other.
+    /// Indicates whether the two <see cref="DpkgVersion"/> instances are not equal to each other.
     /// </summary>
-    /// <param name="a">The first <see cref="DebVersion"/> instance to compare with <paramref name="b"/>.</param>
-    /// <param name="b">The second <see cref="DebVersion"/> instance to compare with <paramref name="a"/>.</param>
+    /// <param name="a">The first <see cref="DpkgVersion"/> instance to compare with <paramref name="b"/>.</param>
+    /// <param name="b">The second <see cref="DpkgVersion"/> instance to compare with <paramref name="a"/>.</param>
     /// <returns>
     /// <see langword="true"/> if <paramref name="a"/> is not equal to <paramref name="b"/>;
     /// otherwise <see langword="false"/>.
     /// </returns>
-    public static bool operator !=(DebVersion? a, DebVersion? b)
+    public static bool operator !=(DpkgVersion? a, DpkgVersion? b)
     {
         if (a is null) return b is not null;
         return !a.Equals(b);
@@ -242,14 +242,14 @@ public class DebVersion :
     public int CompareTo(object? other) => other switch 
     {
         null => 1,
-        DebVersion debVersion => CompareTo(debVersion),
+        DpkgVersion debVersion => CompareTo(debVersion),
         _ => throw new ArgumentException(
             paramName: nameof(other),
-            message: $"Can't compare type {other.GetType().FullName} with type {typeof(DebVersion).FullName}.")
+            message: $"Can't compare type {other.GetType().FullName} with type {typeof(DpkgVersion).FullName}.")
     };
     
     /// <inheritdoc cref="IComparable{T}.CompareTo(T?)" />
-    public int CompareTo(DebVersion? other)
+    public int CompareTo(DpkgVersion? other)
     {
         if (other is null) return 1;
         
@@ -330,32 +330,32 @@ public class DebVersion :
         }
     }
     
-    public static bool operator >(DebVersion? a, DebVersion? b)
+    public static bool operator >(DpkgVersion? a, DpkgVersion? b)
     {
         if (a is null) return false;
         return a.CompareTo(b) > 0;
     }
     
-    public static bool operator >=(DebVersion? a, DebVersion? b)
+    public static bool operator >=(DpkgVersion? a, DpkgVersion? b)
     {
         if (a is null) return b is null;
         return a.CompareTo(b) >= 0;
     }
     
-    public static bool operator <(DebVersion? a, DebVersion? b)
+    public static bool operator <(DpkgVersion? a, DpkgVersion? b)
     {
         if (a is null) return b is not null;
         return a.CompareTo(b) < 0;
     }
     
-    public static bool operator <=(DebVersion? a, DebVersion? b)
+    public static bool operator <=(DpkgVersion? a, DpkgVersion? b)
     {
         if (a is null) return true;
         return a.CompareTo(b) <= 0;
     }
     
     /// <summary>
-    /// Parses a <see langword="string"/> into a <see cref="DebVersion"/> value.
+    /// Parses a <see langword="string"/> into a <see cref="DpkgVersion"/> value.
     /// </summary>
     /// <param name="value">The <see langword="string"/> to parse.</param>
     /// <param name="formatProvider">
@@ -365,14 +365,14 @@ public class DebVersion :
     /// <returns>The result of parsing <paramref name="value"/>.</returns>
     /// <remarks>
     /// The <paramref name="formatProvider"/> is ignored during parsing, because <see langword="string"/>
-    /// representations of <see cref="DebVersion"/> must be parsed culture invariant.
+    /// representations of <see cref="DpkgVersion"/> must be parsed culture invariant.
     /// </remarks>
     /// <exception cref="ArgumentNullException"><paramref name="value"/> is <see langword="null"/>.</exception>
     /// <exception cref="FormatException">
     /// The format of <paramref name="value"/> violates the format described in the
     /// <see href="https://manpages.ubuntu.com/manpages/noble/en/man7/deb-version.7.html">deb-version(7)</see> man page.
     /// </exception>
-    public static DebVersion Parse(string value, IFormatProvider? formatProvider = null)
+    public static DpkgVersion Parse(string value, IFormatProvider? formatProvider = null)
     {
         return ParseCore(
             value: value ?? throw new ArgumentNullException(paramName: nameof(value)), 
@@ -380,7 +380,7 @@ public class DebVersion :
     }
     
     /// <summary>
-    /// Tries to parse a <see langword="string"/> into a <see cref="DebVersion"/> value.
+    /// Tries to parse a <see langword="string"/> into a <see cref="DpkgVersion"/> value.
     /// </summary>
     /// <param name="value">The <see langword="string"/> to parse.</param>
     /// <param name="formatProvider">
@@ -395,14 +395,14 @@ public class DebVersion :
     public static bool TryParse(
         string? value, 
         IFormatProvider? formatProvider, 
-        [NotNullWhen(returnValue: true)] out DebVersion? debVersion)
+        [NotNullWhen(returnValue: true)] out DpkgVersion? debVersion)
     {
         debVersion = ParseCore(value, throwOnError: false);
         return debVersion is not null;
     }
     
     /// <summary>
-    /// Parses a span of characters into a <see cref="DebVersion"/> value.
+    /// Parses a span of characters into a <see cref="DpkgVersion"/> value.
     /// </summary>
     /// <param name="value">The span of characters to parse.</param>
     /// <param name="formatProvider">
@@ -412,19 +412,19 @@ public class DebVersion :
     /// <returns>The result of parsing <paramref name="value"/>.</returns>
     /// <remarks>
     /// The <paramref name="formatProvider"/> is ignored during parsing, because <see langword="string"/>
-    /// representations of <see cref="DebVersion"/> must be parsed culture invariant.
+    /// representations of <see cref="DpkgVersion"/> must be parsed culture invariant.
     /// </remarks>
     /// <exception cref="FormatException">
     /// The format of <paramref name="value"/> violates the format described in the
     /// <see href="https://manpages.ubuntu.com/manpages/noble/en/man7/deb-version.7.html">deb-version(7)</see> man page.
     /// </exception>
-    public static DebVersion Parse(ReadOnlySpan<char> value, IFormatProvider? formatProvider = null)
+    public static DpkgVersion Parse(ReadOnlySpan<char> value, IFormatProvider? formatProvider = null)
     {
         return ParseCore(value, throwOnError: true)!;
     }
     
     /// <summary>
-    /// Tries to parse a span of characters into a <see cref="DebVersion"/> value.
+    /// Tries to parse a span of characters into a <see cref="DpkgVersion"/> value.
     /// </summary>
     /// <param name="value">The span of characters to parse.</param>
     /// <param name="formatProvider">
@@ -439,15 +439,15 @@ public class DebVersion :
     public static bool TryParse(
         ReadOnlySpan<char> value, 
         IFormatProvider? formatProvider, 
-        [NotNullWhen(returnValue: true)] out DebVersion? debVersion)
+        [NotNullWhen(returnValue: true)] out DpkgVersion? debVersion)
     {
         debVersion = ParseCore(value, throwOnError: false);
         return debVersion is not null;
     }
     
-    protected static DebVersion? ParseCore(ReadOnlySpan<char> value, bool throwOnError)
+    protected static DpkgVersion? ParseCore(ReadOnlySpan<char> value, bool throwOnError)
     {
-        if (value.Length == 0) return DebVersion.Empty;
+        if (value.Length == 0) return DpkgVersion.Empty;
         
         return TryParseCore(
             value, throwOnError,
@@ -461,7 +461,7 @@ public class DebVersion :
             out var debianRevision,
             out var hasUbuntuRevision,
             out var ubuntuRevision)
-            ? new DebVersion(
+            ? new DpkgVersion(
                 epoch: epoch.Length > 0 ? epoch.ToString() : null,
                 upstreamVersion: upstreamVersion.ToString(),
                 revertedUpstreamVersion: hasRealUpstreamVersionDelimiter ? revertedUpstreamVersion.ToString() : null,
@@ -643,6 +643,6 @@ public class DebVersion :
             || character == '+' || character == '.' || character == '~';
     }
     
-    public static explicit operator string(DebVersion debVersion) => debVersion.ToString();
-    public static explicit operator DebVersion(string debVersion) => Parse(debVersion);
+    public static explicit operator string(DpkgVersion dpkgVersion) => dpkgVersion.ToString();
+    public static explicit operator DpkgVersion(string debVersion) => Parse(debVersion);
 }
