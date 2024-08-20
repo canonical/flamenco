@@ -2,15 +2,25 @@ using System.Text.RegularExpressions;
 
 namespace Flamenco;
 
+public static class ValidDescriptorFileNames
+{
+    public static IEnumerable<string> All =>
+    [
+        External
+    ];
+
+    public const string External = "flamenco.external";
+}
+
 /*
 public record Series
 {
     // .NET Regex Language reference:
     // https://learn.microsoft.com/en-us/dotnet/standard/base-types/regular-expression-language-quick-reference#anchors
     private static readonly Regex SeriesNamePattern = new Regex(
-        pattern: "\A([a-z]+)\z", 
+        pattern: "\A([a-z]+)\z",
         options: RegexOptions.Compiled);
-    
+
     public string Name { get; private init; }
 
     public Series? Parse(string value)
@@ -20,7 +30,7 @@ public record Series
             Log.Error($"'{value}' is an invalid series name.");
             return null;
         }
-        
+
         return new Series
         {
             Name = value
@@ -36,7 +46,7 @@ public record Package
     // .NET Regex Language reference:
     // https://learn.microsoft.com/en-us/dotnet/standard/base-types/regular-expression-language-quick-reference#anchors
     private static readonly Regex PackageNamePattern = new Regex(
-        pattern: "\A([a-z0-9][-a-z0-9.+]+)\z", 
+        pattern: "\A([a-z0-9][-a-z0-9.+]+)\z",
         options: RegexOptions.Compiled);
     public string Name { get; private init; }
 
@@ -47,7 +57,7 @@ public record Package
             Log.Error($"'{value}' is an invalid package name.");
             return null;
         }
-        
+
         return new Package
         {
             Name = value
