@@ -1,0 +1,26 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <!-- fails build if source generator failed to generate source -->
+    <WarningsAsErrors>CS8785</WarningsAsErrors>
+  </PropertyGroup>
+  
+  <ItemGroup>
+    <ProjectReference Include="../Flamenco.Distro.ReleaseInfo.SourceGenerator/Flamenco.Distro.ReleaseInfo.SourceGenerator.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../Flamenco.Distro.Services.Abstractions/Flamenco.Distro.Services.Abstractions.csproj" />
+    <ProjectReference Include="../Flamenco.Packaging.Dpkg/Flamenco.Packaging.Dpkg.csproj" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <AdditionalFiles Include="/usr/share/distro-info/ubuntu.csv" />
+    <AdditionalFiles Include="/usr/share/distro-info/debian.csv" />
+  </ItemGroup>
+  
+</Project>
+
