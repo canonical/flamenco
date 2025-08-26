@@ -10,6 +10,7 @@
 
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Text;
 using Flamenco.Packaging.Dpkg;
 
 namespace Flamenco.Packaging;
@@ -76,7 +77,7 @@ public class DebianSourcePackageBuilder
                 break;
         }
         
-        var destinationDirectory = new DirectoryInfo(Path.Combine(
+        var destinationDebianDirectory = new DirectoryInfo(Path.Combine(
             DestinationDirectory.FullName,
             $"{BuildTarget.PackageName}-{changelogEntry.Version}", 
             "debian"));
@@ -99,12 +100,12 @@ public class DebianSourcePackageBuilder
         result = await result
             .Then(() => RecursivelyCopyMatchingFilesAsync(
                 sourceDirectory: SourceDirectory.DirectoryInfo,
-                destinationDirectory: destinationDirectory,
+                destinationDirectory: destinationDebianDirectory,
                 cancellationToken: cancellationToken))
             .ConfigureAwait(false);
 
         if (debianDirectoryOnly) return result;
-        
+
         return await result
             /* .Bind(() => TarArchivingServiceProvider.CreateTarArchiveAsync(
                 archiveFile: new FileInfo(fileName: Path.Combine(
@@ -118,48 +119,108 @@ public class DebianSourcePackageBuilder
                 cancellationToken)) */
             .Then(() => TarArchivingServiceProvider.ExtractTarArchiveAsync(
                 archiveFile: origTarball,
-                targetDirectory: destinationDirectory.Parent!,
+                targetDirectory: destinationDebianDirectory.Parent!,
                 stripComponents: 1,
                 cancellationToken))
-            .Then(async () =>
-            {
-                try
-                {
-                    var dpkgBuildPackage = new Process();
-                    dpkgBuildPackage.StartInfo = new ProcessStartInfo(
-                        fileName: "/usr/bin/dpkg-buildpackage",
-                        arguments: "--build=source --no-pre-clean --no-check-builddeps -sa")
-                    {
-                        WorkingDirectory = destinationDirectory.Parent!.FullName,
-                        UseShellExecute = false,
-                        CreateNoWindow = true,
-                    };
-
-                    dpkgBuildPackage.Start();
-                    await dpkgBuildPackage.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
-
-                    if (dpkgBuildPackage.ExitCode != 0)
-                    {
-                        return new Result().WithAnnotation(new DpkgBuildPackageFailed(
-                            buildTarget: BuildTarget,
-                            location: new Location { ResourceLocator = destinationDirectory.Parent!.FullName },
-                            reason: $"Exit code '{dpkgBuildPackage.ExitCode}' is non zero"));
-                    }
-                    
-                    return Result.Success;
-                }
-                catch (Exception exception)
-                {
-                    return new Result().WithAnnotation(new DpkgBuildPackageFailed(
-                        reason: $"Unexpected exception '{exception.GetType().FullName}'. {exception.Message}",
-                        buildTarget: BuildTarget,
-                        location: new Location { ResourceLocator = destinationDirectory.Parent!.FullName },
-                        innerAnnotations: ImmutableList.Create<IAnnotation>(new ExceptionalAnnotation(exception))));
-                }
-            })
+            .Then(() => RunDpkgBuildPackageAsync(
+                sourceTreeDirectory: destinationDebianDirectory.Parent!,
+                buildTarget: BuildTarget,
+                cancellationToken: cancellationToken))
             .ConfigureAwait(false);
     }
 
+    private static async Task<Result> RunDpkgBuildPackageAsync(
+        DirectoryInfo sourceTreeDirectory, 
+        BuildTarget buildTarget, 
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var dpkgBuildPackage = new Process()
+            {
+                StartInfo = new ProcessStartInfo(
+                    fileName: "/usr/bin/env",
+                    arguments: [
+                        "dpkg-buildpackage", 
+                        "--build=source",
+                        "--no-pre-clean", 
+                        "--no-check-builddeps",
+                        "-sa",
+                    ])
+                {
+                    WorkingDirectory = sourceTreeDirectory.FullName,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                },
+            };
+#if SNAPCRAFT
+            string snapRoot = Environment.GetEnvironmentVariable("SNAP") 
+                              ?? throw new UnreachableException("Could not find SNAP environment variable.");
+            
+            // dpkg-genbuildinfo tries to search outside the snap confinement by default
+            dpkgBuildPackage.StartInfo.ArgumentList.Add($"--buildinfo-option=--admindir={snapRoot}/var/lib/dpkg");
+            
+            // fix perl applications in snap confinement, see also:
+            // https://forum.snapcraft.io/t/the-perl-launch-launcher-fix-perl-applications-in-the-snap-runtime/11736
+            dpkgBuildPackage.StartInfo.Environment.Add("PERLLIB", GetPerlLibraryPaths(snapRoot));
+#endif
+            dpkgBuildPackage.Start();
+            await dpkgBuildPackage.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+
+            if (dpkgBuildPackage.ExitCode != 0)
+            {
+                return new Result().WithAnnotation(
+                    new DpkgBuildPackageFailed(
+                        buildTarget: buildTarget, 
+                        location: new Location { ResourceLocator = sourceTreeDirectory.FullName }, 
+                        reason: $"Exit code '{dpkgBuildPackage.ExitCode}' is non zero"));
+            }
+
+            return Result.Success;
+        }
+        catch (Exception exception)
+        {
+            return new Result().WithAnnotation(
+                new DpkgBuildPackageFailed(
+                    reason: $"Unexpected exception '{exception.GetType().FullName}'. {exception.Message}", 
+                    buildTarget: buildTarget, 
+                    location: new Location { ResourceLocator = sourceTreeDirectory.FullName }, 
+                    innerAnnotations: ImmutableList.Create<IAnnotation>(new ExceptionalAnnotation(exception))));
+        }
+    }
+
+#if SNAPCRAFT
+    private static string GetPerlLibraryPaths(string snapRoot)
+    {
+        List<string> perlLibraryPaths =  [];
+        string debianMultiarchTriplet = Environment.GetEnvironmentVariable("X_DEBIAN_MULTIARCH_TRIPLET") ?? string.Empty;
+        
+        string[] staticSearchPaths = [
+                $"{snapRoot}/usr/lib/{debianMultiarchTriplet}/perl-base",
+                $"{snapRoot}/usr/share/perl5",
+                $"{snapRoot}/etc/perl",
+                $"{snapRoot}/usr/local/lib/site_perl",
+            ];
+        perlLibraryPaths.AddRange(
+            staticSearchPaths
+            .Where(Directory.Exists));
+        
+        string[] dynamicSearchPaths = [
+            $"{snapRoot}/usr/lib/{debianMultiarchTriplet}/perl",
+            $"{snapRoot}/usr/lib/{debianMultiarchTriplet}/perl5",
+            $"{snapRoot}/usr/share/perl",
+            $"{snapRoot}/usr/local/lib/{debianMultiarchTriplet}/perl",
+            $"{snapRoot}/usr/local/share/perl",
+        ];
+        perlLibraryPaths.AddRange(
+            dynamicSearchPaths
+            .Where(Directory.Exists)
+            .SelectMany(Directory.GetDirectories));
+
+        return string.Join(':', perlLibraryPaths);
+    }
+#endif
+    
     private async Task<Result> RecursivelyCopyMatchingFilesAsync(
         DirectoryInfo sourceDirectory,
         DirectoryInfo destinationDirectory,

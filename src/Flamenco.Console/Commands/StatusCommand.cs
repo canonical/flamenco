@@ -29,11 +29,13 @@ public class StatusCommand: Command
             return -1;
         }
 
-        if (!Program.IsPathAccessible(sourceDirectory.FullName))
+#if SNAPCRAFT
+        if (!await Program.IsPathAccessibleAsync(sourceDirectory.FullName, cancellationToken))
         {
             Log.Fatal("Aborting the status process, because some paths are not accessible.");
             return -1;
         }
+#endif
 
         Result<SourceDirectoryInfo> sourceDirectoryInfoResult = Result.Success;
         Result<IImmutableList<DpkgPackageReleaseState>> queryReleaseStatesResult = Result.Success;

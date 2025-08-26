@@ -43,12 +43,14 @@ public class PackCommand : Command
         Log.Debug("Source Directory: " + sourceDirectory.FullName);
         Log.Debug("Destination Directory: " + destinationDirectory.FullName);
 
-        if (!(Program.IsPathAccessible(sourceDirectory.FullName) && 
-            Program.IsPathAccessible(destinationDirectory.FullName)))
+#if SNAPCRAFT
+        if (!await Program.IsPathAccessibleAsync(sourceDirectory.FullName, cancellationToken) || 
+            !await Program.IsPathAccessibleAsync(destinationDirectory.FullName, cancellationToken))
         {
             Log.Fatal("Aborting the packaging process, because some paths are not accessible.");
             return -1;
         }
+#endif
         
         var sourceDirectoryInfoResult = SourceDirectoryInfo.FromDirectory(sourceDirectory);
         Log.Annotations(sourceDirectoryInfoResult);

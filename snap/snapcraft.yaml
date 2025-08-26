@@ -1,63 +1,97 @@
 name: flamenco
-base: core22
+base: core24
 summary: Package maintenance tool for Ubuntu Toolchains
 description: |
   Flamenco is a CLI tool that helps toolchain developers manage many
   different package versions and releases from a single debian
   folder source tree.
 adopt-info: flamenco
+license: GPL-3.0
+source-code: https://github.com/canonical/flamenco
+issues: https://github.com/canonical/flamenco/issues
+contact: dotnet@lists.canonical.com
+icon: images/icon-512.webp
 
 grade: devel
 confinement: strict
-
-architectures:
-  - build-on: [amd64, arm64]
-    build-for: [amd64]
-  - build-on: [amd64, arm64]
-    build-for: [arm64]
+platforms:
+  amd64:
+    build-on:
+      - amd64
+    build-for:
+      - amd64
+  arm64:
+    build-on:
+      - arm64
+    build-for:
+      - arm64
 
 parts:
   flamenco:
     source: .
-    plugin: nil
+    plugin: dotnet
+    dotnet-project: src/Flamenco.Console/Flamenco.Console.csproj
+    dotnet-version: "8.0"
+    dotnet-properties:
+      DefineConstants: SNAPCRAFT
     build-packages:
-      - dotnet-sdk-8.0
+      - git
+      - distro-info-data
     stage-packages:
-      - libicu70
-      - liblttng-ust1
-      - tar
-      - xz-utils
+      - dpkg      # needed by dpkg-buildpackage
+      - dpkg-dev  # needed for dpkg-buildpackage
+      - fakeroot  # needed by dpkg-buildpackage
+      - libicu74  # needed by .NET runtime
+      - tar       # needed by dpkg-buildpackage
+      - xz-utils  # needed by dpkg-buildpackage
     override-build: |
-      /usr/bin/dotnet --info
-
-      if [ "${CRAFT_ARCH_BUILD_FOR}" = "amd64" ]; then
-        RUNTIME_RID="linux-x64"
-      elif [ "${CRAFT_ARCH_BUILD_FOR}" = "arm64" ]; then
-        RUNTIME_RID="linux-arm64"
-      else
-        echo "Unknown architecture (${CRAFT_ARCH_BUILD_FOR})"
-        exit 1
-      fi
-
-      /usr/bin/dotnet publish src --output "${SNAPCRAFT_PART_INSTALL}" --configuration Release \
-        -r "${RUNTIME_RID}" -p:DebugSymbols=false -p:DebugType=none
-      chmod 555 "${SNAPCRAFT_PART_INSTALL}/Flamenco"
-
-      FLAMENCO_VERSION=$(cat src/Flamenco.csproj | grep \<Version\> | awk -F'[<>]' '{print $3}')
-      craftctl set version="${FLAMENCO_VERSION}+git.$(git rev-parse --short HEAD)"
+      FLAMENCO_VERSION="$(cat src/Flamenco.Console/Flamenco.Console.csproj | grep \<Version\> | awk -F'[<>]' '{print $3}')"
+      GIT_HASH="$(git rev-parse --short HEAD)"
+      craftctl set version="${FLAMENCO_VERSION}+git.${GIT_HASH}"
       craftctl default
-    organize:
-      Flamenco: usr/bin/flamenco
+    override-prime: |
+      craftctl default
+      
+      # needed by dpkg-genbuildinfo:
+      cp /var/lib/dpkg/status $CRAFT_PRIME/var/lib/dpkg/
+      
+      cd $CRAFT_PRIME/usr/bin 
+      
+      # when you run 'snapcraft pack' twice it complains that fakeroot
+      # already exists due to the re-used build environment
+      if [ ! -f fakeroot ]; then
+        ln --symbolic fakeroot-sysv fakeroot
+      fi
+      
+      # fix perl shbang of dpkg-* scripts for snap confinement
+      for script in dpkg-*; do
+        sed -i '1 s|#!/usr/bin/perl|#!/usr/bin/env perl|' "$script"
+      done
+  launcher:
+    source: snap/local
+    plugin: dump
+    stage:
+      - launcher.bash
+  
+plugs:
+  dotnet-runtime-80:
+    interface: content
+    content: dotnet-runtime-80
+    target: $SNAP/opt/dotnet8
+    default-provider: dotnet-runtime-80
 
 apps:
   flamenco:
-    command: usr/bin/flamenco
+    environment:
+      DOTNET_ROOT: $SNAP/opt/dotnet8/dotnet
+      X_DEBIAN_MULTIARCH_TRIPLET: $CRAFT_ARCH_TRIPLET_BUILD_FOR
+    command: launcher.bash
     plugs:
       - home
+      - removable-media
+      - dotnet-runtime-80
 
 lint:
   ignore: 
     - library:
       - libicu*
-      - liblttng-ust-*
-      - libcoreclrtraceptprovider.so
