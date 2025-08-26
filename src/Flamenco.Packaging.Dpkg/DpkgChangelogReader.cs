@@ -9,8 +9,10 @@
 // If not, see <http://www.gnu.org/licenses/>.
 
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Globalization;
 using System.Security;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace Flamenco.Packaging.Dpkg;
@@ -23,6 +25,7 @@ public sealed class DpkgChangelogReader(TextReader textReader, Location location
     private LinePosition _entryStart;
     private LinePosition _entryEnd;
     private ChangelogEntryTitle? _bufferedTitle;
+    private string? _bufferedTrailerLine;
 
     public Location Location { get; } = location;
     
@@ -100,8 +103,14 @@ public sealed class DpkgChangelogReader(TextReader textReader, Location location
         if (!readTitleResult.Value.HasValue) return result.WithValue<ChangelogEntry?>(default);
         var title = readTitleResult.Value.Value;
         
+        // read description:
+        var readDescriptionResult = await ReadDescriptionAsync(cancellationToken);
+        result = result.Merge(readDescriptionResult);
+        if (result.IsFailure) return result;
+        var description = readDescriptionResult.Value;
+        
         // read trailer:
-        var readTrailerResult = await ReadTrailerAsync(cancellationToken);
+        var readTrailerResult = ReadTrailer();
         result = result.Merge(readTrailerResult);
         if (result.IsFailure) return result;
         var trailer = readTrailerResult.Value;
@@ -112,6 +121,7 @@ public sealed class DpkgChangelogReader(TextReader textReader, Location location
             Version: title.Version,
             Distributions: title.Distributions,
             Metadata: title.Metadata,
+            Description: description,
             Maintainer: trailer.Maintainer,
             Date: trailer.Date,
             Location: new Location { TextSpan = new LinePositionSpan(_entryStart, _entryEnd) }.Offset(Location)));
@@ -139,8 +149,8 @@ public sealed class DpkgChangelogReader(TextReader textReader, Location location
             {
                 return result.WithAnnotation(new MalformedDpkgChangelogEntry(
                     reason: $"While searching for the start of a changelog entry, found line {_currentLine + 1}, " +
-                            "which contains non-whitespace characters, but starts with a whitespace characters." +
-                            "Changelog header lines are not allowed to start with a non-whitespace character.",
+                            "which contains non-whitespace characters, but starts with a whitespace character." +
+                            "Changelog header lines must start with a non-whitespace character.",
                     location: GetCurrentLocation(),
                     metadata: ImmutableDictionary<string, object?>.Empty.Add("Line", line)));
             }
@@ -161,19 +171,20 @@ public sealed class DpkgChangelogReader(TextReader textReader, Location location
         return result.WithValue(title);
     }
 
-    private async ValueTask<Result<string>> ReadTrailerLineAsync(CancellationToken cancellationToken)
+    private async ValueTask<Result<string>> ReadDescriptionAsync(CancellationToken cancellationToken)
     {
         var result = new Result();
         string? line;
+        var description = new StringBuilder();
 
-        do
+        while (true)
         {
             var readLineResult = await ReadLineAsync(cancellationToken);
             result = result.Merge(readLineResult);
 
             if (result.IsFailure) return result;
             line = readLineResult.Value;
-
+            
             // end of stream
             if (line is null)
             {
@@ -182,20 +193,32 @@ public sealed class DpkgChangelogReader(TextReader textReader, Location location
                     location: GetCurrentLocation(),
                     metadata: ImmutableDictionary<string, object?>.Empty.Add("Line", line)));
             }
-        } while (string.IsNullOrWhiteSpace(line) || line is [' ', ' ', ..]);
 
-        return result.WithValue(line);
+            if (string.IsNullOrWhiteSpace(line) || line is [' ', ' ', ..])
+            {
+                description.AppendLine(line);
+            }
+            else
+            {
+                _bufferedTrailerLine = line;
+                return result.WithValue(description.ToString());
+            }
+        }
     }
     
-    private async ValueTask<Result<ChangelogEntryTrailer>> ReadTrailerAsync(CancellationToken cancellationToken)
+    private Result<ChangelogEntryTrailer> ReadTrailer()
     {
         var result = new Result();
+
+        if (_bufferedTrailerLine == null)
+        {
+            throw new UnreachableException(
+                "This state should not be reachable, because it is expected that ReadDescriptionAsync is called " + 
+                "before this method which sets _bufferedTrailerLine to a non null value.");
+        }
         
-        var readTrailerLineResult = await ReadTrailerLineAsync(cancellationToken);
-        result = result.Merge(readTrailerLineResult);
-        if (result.IsFailure) return result;
-        
-        string line = readTrailerLineResult.Value;
+        string line = _bufferedTrailerLine;
+        _bufferedTrailerLine = null;
         _entryEnd = new LinePosition(line: _currentLine, character: line.Length - 1);
 
         var parseTrailerLineResult = ChangelogEntryTrailer.Parse(line, GetCurrentLocation());

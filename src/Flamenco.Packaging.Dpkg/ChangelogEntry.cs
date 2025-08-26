@@ -17,6 +17,7 @@ public readonly record struct ChangelogEntry(
     DpkgVersion Version,
     ImmutableArray<DpkgSuite> Distributions,
     ImmutableDictionary<string, string> Metadata,
+    string Description,
     MaintainerInfo Maintainer,
     DateTimeOffset Date,
     Location Location = default)

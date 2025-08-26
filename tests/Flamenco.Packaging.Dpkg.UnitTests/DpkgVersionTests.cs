@@ -30,14 +30,14 @@ public class DpkgVersionTests
     [Fact]
     public void Parsing_EmptyString_Works()
     {
-        DpkgVersion.Parse(string.Empty);
+        Parse(string.Empty);
     }
     
     [Theory]
     [InlineData("a:1")]
     public void Parsing_InvalidVersionString_Fails(string invalidVersionString)
     {
-        Assert.True(DpkgVersion.Parse(invalidVersionString).IsFailure);
+        Assert.True(DpkgVersion.Parse(invalidVersionString, Location.Unspecified).IsFailure);
     }
     
      [Theory]
@@ -201,7 +201,7 @@ public class DpkgVersionTests
 
      private DpkgVersion Parse(string version)
      {
-         var parseDpkgVersionResult = DpkgVersion.Parse(version);
+         var parseDpkgVersionResult = DpkgVersion.Parse(version, Location.Unspecified);
          Assert.True(parseDpkgVersionResult.IsSuccess);
          return parseDpkgVersionResult.Value;
      }

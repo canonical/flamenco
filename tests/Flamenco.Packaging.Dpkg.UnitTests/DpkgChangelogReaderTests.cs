@@ -34,6 +34,17 @@ public class DpkgChangelogReaderTests
         Assert.Equal(expected: "medium", actual: entry.Urgency);
         Assert.Null(entry.BinaryOnly);
         
+        Assert.Equal(
+            expected: """
+            
+              * Initial release for Ubuntu 24.04 LTS (Noble Numbat):
+                - debian/control: Switch to libicu74.
+                - debian/patches/add-ubuntu-noble-numbat-runtime-identifier.patch
+            
+            
+            """,
+            actual: entry.Description);
+        
         Assert.Equal(expected: "Dominik Viererbe", actual: entry.Maintainer.Name);
         Assert.Equal(expected: "dominik.viererbe@canonical.com", actual: entry.Maintainer.EmailAddress);
         Assert.Equal(
