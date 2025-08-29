@@ -39,7 +39,9 @@ jobs:
       - name: checkout source code
         uses: actions/checkout@v4
       - name: install .NET 8
-        run: sudo apt-get install --update dotnet8
+        run: |
+          sudo apt-get update
+          sudo apt-get install dotnet8
       - name: build flamenco
         run: |
           dotnet build \ 
