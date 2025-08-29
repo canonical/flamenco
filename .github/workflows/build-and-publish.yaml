@@ -1,0 +1,110 @@
+name: CI/CD workflow of flamenco
+
+on:
+  push:
+    branches: main
+    paths:
+      - src/**
+      - tests/**
+      - snap/**
+  pull_request:
+    branches: main
+  workflow_dispatch:
+
+jobs:
+  shellcheck:
+    name: run shellcheck (shell linter)
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout source code
+        uses: actions/checkout@v4
+      - name: install shellcheck
+        run: sudo apt-get install --update shellcheck
+      - name: run shellcheck
+        run: find . -type f -iname '*.bash' -exec shellcheck {} +
+  test:
+    name: run flamenco test-suites
+    strategy:
+      matrix:
+        os:
+          - [self-hosted, large, jammy, X64]
+          - [self-hosted, large, jammy, ARM64]
+        additional-dotnet-args:
+          - ''
+          - '-property:DefineConstants=SNAPCRAFT'
+    runs-on: ${{ matrix.os }}
+    env:
+      ADDITIONAL_DOTNET_ARGS: ${{ matrix.additional-dotnet-args }}
+    steps:
+      - name: checkout source code
+        uses: actions/checkout@v4
+      - name: install .NET 8
+        run: sudo apt-get --update install dotnet8
+      - name: build flamenco
+        run: |
+          dotnet build \ 
+            --configuration Release \
+            $ADDITIONAL_DOTNET_ARGS \
+            src/Flamenco.Console/Flamenco.Console.csproj
+      - name: run tests
+        run: |
+          dotnet test \
+            --configuration Release \
+            $ADDITIONAL_DOTNET_ARGS
+
+  build-snap:
+    name: build flamenco snap
+    needs: 
+      - shellcheck
+      - test
+    strategy:
+      matrix:
+        os:
+          - [self-hosted, large, jammy, X64]
+          - [self-hosted, large, jammy, ARM64]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: checkout source code
+        uses: actions/checkout@v4
+      - name: read host architecture
+        id: get-arch
+        run: echo "DPKG_ARCH=$(dpkg --print-architecture)" >> "$GITHUB_OUTPUT"
+      - name: run snapcraft pack
+        id: snapcraft
+        uses: snapcore/action-build@v1
+      - name: upload snap to workflow artifacts
+        id: upload-artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: flamenco-${{ steps.get-arch.outputs.DPKG_ARCH }}
+          path: ${{ steps.snapcraft.outputs.snap }}
+
+  publish:
+    name: publish flamenco snap
+    if: ${{ contains(fromJSON('["push", "workflow_dispatch"]'), github.event_name) && github.ref_name == 'main' }}
+    needs: build-snap
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        artifact-name:
+          - dotnet-amd64
+          - dotnet-arm64
+    steps:
+      - uses: actions/download-artifact@v4
+        id: download-artifact
+        with:
+          name: ${{ matrix.artifact-name }}
+      - name: Gather filename
+        id: gather-filename
+        env:
+          ARTIFACT_PATH: ${{ steps.download-artifact.outputs.download-path }}
+        run: |
+          ls -la $ARTIFACT_PATH
+          SNAP_FILE_NAME=$(ls ${ARTIFACT_PATH}/flamenco*.snap)
+          echo "SNAP_PATH=${SNAP_FILE_NAME}" >> "$GITHUB_OUTPUT"
+      - uses: snapcore/action-publish@v1
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAP_STORE_LOGIN }}
+        with:
+          snap: ${{ steps.gather-filename.outputs.SNAP_PATH }}
+          release: edge
