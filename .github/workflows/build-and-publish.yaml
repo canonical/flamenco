@@ -30,12 +30,11 @@ jobs:
         os:
           - [self-hosted, large, jammy, X64]
           - [self-hosted, large, jammy, ARM64]
-        additional-dotnet-args:
-          - ''
-          - '-property:DefineConstants=SNAPCRAFT'
+        defineSnapcraftConstant:
+          - true
+          - false
     runs-on: ${{ matrix.os }}
     env:
-      ADDITIONAL_DOTNET_ARGS: ${{ matrix.additional-dotnet-args }}
       DOTNET_NOLOGO: 'true'
       DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
     steps:
@@ -44,19 +43,18 @@ jobs:
       - name: install .NET 8
         run: |
           sudo apt-get update
-          sudo apt-get install --assume-yes dotnet8
+          sudo apt-get install --assume-yes dotnet8 distro-info-data
           dotnet --info
+      - name: define SNAPCRAFT .NET compiler constant
+        if: ${{ matrix.defineSnapcraftConstant }}
+        run: export ADDITIONAL_DOTNET_ARGS='-property:DefineConstants=SNAPCRAFT'
       - name: build flamenco
-        run: |
-          dotnet build \ 
-            --configuration Release \
-            $ADDITIONAL_DOTNET_ARGS \
-            src/Flamenco.Console/Flamenco.Console.csproj
+        shell: bash
+        run:
+          dotnet build --verbosity diagnostic --configuration Release ${ADDITIONAL_DOTNET_ARGS:-} src/Flamenco.Console/Flamenco.Console.csproj
       - name: run tests
-        run: |
-          dotnet test \
-            --configuration Release \
-            $ADDITIONAL_DOTNET_ARGS
+        shell: bash
+        run: dotnet test --configuration Release ${ADDITIONAL_DOTNET_ARGS:-}
 
   build-snap:
     name: build flamenco snap
@@ -93,8 +91,8 @@ jobs:
     strategy:
       matrix:
         artifact-name:
-          - dotnet-amd64
-          - dotnet-arm64
+          - flamenco-amd64
+          - flamenco-arm64
     steps:
       - uses: actions/download-artifact@v4
         id: download-artifact
