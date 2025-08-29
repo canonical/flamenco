@@ -35,6 +35,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       ADDITIONAL_DOTNET_ARGS: ${{ matrix.additional-dotnet-args }}
+      DOTNET_NOLOGO: 'true'
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
     steps:
       - name: checkout source code
         uses: actions/checkout@v4
@@ -42,6 +44,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --assume-yes dotnet8
+          dotnet --info
       - name: build flamenco
         run: |
           dotnet build \ 
