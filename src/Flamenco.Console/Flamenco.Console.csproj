@@ -3,11 +3,6 @@
   <PropertyGroup>
     <Version>0.1.0</Version>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <LangVersion>12</LangVersion>
-    <DefineConstants Condition="'$(Configuration)' == 'Debug'">SNAPCRAFT</DefineConstants>
   </PropertyGroup>
     
   <ItemGroup>

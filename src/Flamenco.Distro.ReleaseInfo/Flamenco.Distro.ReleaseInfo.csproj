@@ -1,10 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-
     <!-- fails build if source generator failed to generate source -->
     <WarningsAsErrors>CS8785</WarningsAsErrors>
   </PropertyGroup>
