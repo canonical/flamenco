@@ -19,7 +19,7 @@ jobs:
       - name: checkout source code
         uses: actions/checkout@v4
       - name: install shellcheck
-        run: sudo apt-get install --update shellcheck
+        run: sudo apt-get install --assume-yes --update shellcheck
       - name: run shellcheck
         run: find . -type f -iname '*.bash' -exec shellcheck {} +
   test:
@@ -41,7 +41,7 @@ jobs:
       - name: install .NET 8
         run: |
           sudo apt-get update
-          sudo apt-get install dotnet8
+          sudo apt-get install --assume-yes dotnet8
       - name: build flamenco
         run: |
           dotnet build \ 
