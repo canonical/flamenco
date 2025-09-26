@@ -27,6 +27,8 @@ public class DebianSourcePackageBuilder
     
     public required ITarArchivingServiceProvider TarArchivingServiceProvider { get; set; }
     
+    public required BuildOutput BuildOutput { get; set; }
+    
     public async ValueTask<Result> BuildDebianSourcePackageAsync(CancellationToken cancellationToken = default)
     {
         var result = new Result();
@@ -86,42 +88,17 @@ public class DebianSourcePackageBuilder
             DestinationDirectory.FullName,
             $"{changelogEntry.PackageName}_{changelogEntry.Version.UpstreamVersion}" +
             $".orig.tar{TarballCompressionMethod.FileExtension()}"));
-
-        bool debianDirectoryOnly = false;
-        if (!debianDirectoryOnly)
-        {
-            if (!origTarball.Exists)
-            {
-                return result.WithAnnotation(new OrigTarballNotFound(
-                    BuildTarget, new Location { ResourceLocator = origTarball.FullName }));
-            }
-        }
-
-        result = await result
+        
+        return await result
+            .Then(() => CheckOrigTarballExists(origTarball))
             .Then(() => RecursivelyCopyMatchingFilesAsync(
                 sourceDirectory: SourceDirectory.DirectoryInfo,
                 destinationDirectory: destinationDebianDirectory,
                 cancellationToken: cancellationToken))
-            .ConfigureAwait(false);
-
-        if (debianDirectoryOnly) return result;
-
-        return await result
-            /* .Bind(() => TarArchivingServiceProvider.CreateTarArchiveAsync(
-                archiveFile: new FileInfo(fileName: Path.Combine(
-                    DestinationDirectory.FullName,
-                    $"{BuildTarget.PackageName}_{changelogEntry.Version}" +
-                    $".debian.tar{TarballCompressionMethod.FileExtension()}")),
-                archiveRoot: destinationDirectory
-                    .Parent!, // the steps before should ensure that the parent directory exists
-                includedPaths: new[] { "debian" },
-                TarballCompressionMethod,
-                cancellationToken)) */
-            .Then(() => TarArchivingServiceProvider.ExtractTarArchiveAsync(
-                archiveFile: origTarball,
-                targetDirectory: destinationDebianDirectory.Parent!,
-                stripComponents: 1,
-                cancellationToken))
+            .Then(() => ExtractOrigTarballAsync(
+                origTarball: origTarball,
+                sourceTreeRoot: destinationDebianDirectory.Parent!,
+                cancellationToken: cancellationToken))
             .Then(() => RunDpkgBuildPackageAsync(
                 sourceTreeDirectory: destinationDebianDirectory.Parent!,
                 buildTarget: BuildTarget,
@@ -129,13 +106,51 @@ public class DebianSourcePackageBuilder
             .ConfigureAwait(false);
     }
 
-    private static async Task<Result> RunDpkgBuildPackageAsync(
+    private Result CheckOrigTarballExists(FileInfo origTarball)
+    {
+        var result = Result.Success;
+        
+        if (BuildOutput != BuildOutput.DebianDirectoryOnly && !origTarball.Exists)
+        {
+            return result.WithAnnotation(new OrigTarballNotFound(
+                BuildTarget, new Location { ResourceLocator = origTarball.FullName }));
+        }
+        
+        return result;
+    }
+
+    private Task<Result> ExtractOrigTarballAsync(
+        FileInfo origTarball,
+        DirectoryInfo sourceTreeRoot,
+        CancellationToken cancellationToken = default) => BuildOutput switch
+    {
+        BuildOutput.DebianDirectoryOnly => Task.FromResult(Result.Success),
+        _ => TarArchivingServiceProvider.ExtractTarArchiveAsync(
+            archiveFile: origTarball,
+            targetDirectory: sourceTreeRoot,
+            stripComponents: 1,
+            cancellationToken)
+    };
+
+    private async Task<Result> RunDpkgBuildPackageAsync(
         DirectoryInfo sourceTreeDirectory, 
         BuildTarget buildTarget, 
         CancellationToken cancellationToken)
     {
+        if (BuildOutput is BuildOutput.DebianDirectoryOnly or BuildOutput.DebianSourceTreeOnly)
+        {
+            return Result.Success;
+        }
+        
         try
         {
+            var origTarballInclusionArgument = BuildOutput switch
+            {
+                BuildOutput.SourcePackageIncludingOrigTarball => "-sa",
+                BuildOutput.SourcePackageExcludingOrigTarball => "-sd",
+                _ => throw new UnreachableException($"The build output type '{BuildOutput}' is not supported.")
+            };
+            
             var dpkgBuildPackage = new Process()
             {
                 StartInfo = new ProcessStartInfo(
@@ -145,7 +160,7 @@ public class DebianSourcePackageBuilder
                         "--build=source",
                         "--no-pre-clean", 
                         "--no-check-builddeps",
-                        "-sa",
+                        origTarballInclusionArgument,
                     ])
                 {
                     WorkingDirectory = sourceTreeDirectory.FullName,

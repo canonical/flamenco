@@ -6,6 +6,39 @@ namespace Flamenco.Console.Commands;
 
 public class PackCommand : Command
 {
+    private static readonly Option<TarballCompressionMethod> DebianTarballCompressionMethodOption = new (
+        name: "--debian-tarball-compression-method",
+        description: "The compression method used to create debian tar archives. [default: xz]")
+    {
+        Arity = ArgumentArity.ExactlyOne,
+    };
+    
+    private static readonly Option<bool> DebianTreeOnlyOption = new (
+        name: "--debian-tree-only",
+        description: "Only generate the debian directory within the source tree without extracting the " +
+                     ".orig tarball or invoking dpkg-buildpackage. [default: false]",
+        getDefaultValue: () => false)
+    {
+        Arity = ArgumentArity.ZeroOrOne,
+    };
+    
+    private static readonly Option<bool> SourceTreeOnlyOption = new (
+        name: "--source-tree-only",
+        description: "Only generate the complete debian source directory without " +
+                     "invoking dpkg-buildpackage. [default: false]",
+        getDefaultValue: () => false)
+    {
+        Arity = ArgumentArity.ZeroOrOne,
+    };
+    
+    private static readonly Option<bool> ExcludeOrigTarballOption = new (
+        name: "--exclude-orig-tarball",
+        description: "Exclude the .orig tarball from the generated .changes file. [default: false]",
+        getDefaultValue: () => false)
+    {
+        Arity = ArgumentArity.ZeroOrOne,
+    };
+    
     public PackCommand() : base(
         name: "pack", 
         description: "Packages the debian tarball(s) for specific packages and series from a provided source directory.")
@@ -22,7 +55,10 @@ public class PackCommand : Command
         AddArgument(targetArguments);
         AddOption(CommonOptions.SourceDirectoryOption);
         AddOption(CommonOptions.DestinationDirectoryOption);
-        AddOption(CommonOptions.DebianTarballCompressionMethod);
+        AddOption(DebianTarballCompressionMethodOption);
+        AddOption(DebianTreeOnlyOption);
+        AddOption(SourceTreeOnlyOption);
+        AddOption(ExcludeOrigTarballOption);
         Handler = CommandHandler.Create(Run);
     }
     
@@ -31,6 +67,9 @@ public class PackCommand : Command
         DirectoryInfo? sourceDirectory,
         DirectoryInfo? destinationDirectory,
         TarballCompressionMethod? debianTarballCompressionMethod,
+        bool debianTreeOnly,
+        bool sourceTreeOnly,
+        bool excludeOrigTarball,
         CancellationToken cancellationToken = default)
     {
         if (!EnvironmentVariables.TryGetSourceDirectoryInfoFromEnvironmentOrDefaultIfNull(ref sourceDirectory) ||
@@ -39,10 +78,18 @@ public class PackCommand : Command
         {
             return -1;
         }
-        
+
+        if (!TryGetBuildOutput(debianTreeOnly, sourceTreeOnly, excludeOrigTarball, out BuildOutput buildOutput))
+        {
+            Log.Fatal($"The combination of the {DebianTreeOnlyOption.Name}, {SourceTreeOnlyOption.Name}" +
+                      $" and {ExcludeOrigTarballOption.Name} flags is invalid.");
+            return -1;
+        }
+            
         Log.Debug("Source Directory: " + sourceDirectory.FullName);
         Log.Debug("Destination Directory: " + destinationDirectory.FullName);
-
+        Log.Debug("Build Output: " + buildOutput.ToString());
+        
 #if SNAPCRAFT
         if (!await Program.IsPathAccessibleAsync(sourceDirectory.FullName, cancellationToken) || 
             !await Program.IsPathAccessibleAsync(destinationDirectory.FullName, cancellationToken))
@@ -98,7 +145,8 @@ public class PackCommand : Command
                 DestinationDirectory = destinationDirectory,
                 TarballCompressionMethod = debianTarballCompressionMethod.Value,
                 BuildTarget = buildTarget,
-                TarArchivingServiceProvider = new TarSystemCommand()
+                TarArchivingServiceProvider = new TarSystemCommand(),
+                BuildOutput = buildOutput,
             };
 
             packagingTasks.Add(debianTarballBuilder
@@ -146,6 +194,28 @@ public class PackCommand : Command
             }
 
             return allBuildTargetsAreDefined;
+        }
+    }
+
+    private static bool TryGetBuildOutput(bool debianTreeOnly, bool sourceTreeOnly, bool excludeOrigTarball, out BuildOutput buildOutput)
+    {   
+        switch ((debianTreeOnly, sourceTreeOnly, excludeOrigTarball))
+        {
+            case (true, false, false):
+                buildOutput = BuildOutput.DebianDirectoryOnly;
+                return true;
+            case (false, true, false):
+                buildOutput = BuildOutput.DebianSourceTreeOnly;
+                return true;
+            case (false, false, false):
+                buildOutput = BuildOutput.SourcePackageIncludingOrigTarball;
+                return true;
+            case (false, false, true): 
+                buildOutput = BuildOutput.SourcePackageExcludingOrigTarball;
+                return true;
+            default:
+                buildOutput = default;
+                return false;
         }
     }
 
