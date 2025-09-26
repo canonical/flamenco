@@ -96,7 +96,7 @@ public class LaunchpadPpaDpkgReleaseStateProvider(IHttpClientFactory httpClientF
             .Ppa(PpaName);
 
         var ppaEndpointLocation = new Location { ResourceLocator = ppaEndpoint.EndpointRoot.AbsoluteUri };
-        var archiveName = $"ppa:{PpaOwner}:{PpaName}";
+        var archiveName = $"ppa:{PpaOwner}/{PpaName}";
         if (status != PackagePublishingStatus.Published) archiveName += $" ({status})";
         
         FragmentedCollection<PpaSourcePackagePublishingHistoryRecord> publishedSources;

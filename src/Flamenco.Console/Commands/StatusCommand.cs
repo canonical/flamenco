@@ -68,12 +68,10 @@ public class StatusCommand: Command
         {
             var queryOptions = new DpkgReleaseStateQueryOptions
             {
-                PackageNames = ImmutableList.Create(
-                    DpkgName.Parse("dotnet10"),
-                    DpkgName.Parse("dotnet9"),
-                    DpkgName.Parse("dotnet8"),
-                    DpkgName.Parse("dotnet7"),
-                    DpkgName.Parse("dotnet6")),
+                PackageNames = sourceDirectoryInfo.BuildableTargets
+                    .PackageNames
+                    .Select(packageName => DpkgName.Parse(packageName))
+                    .ToImmutableArray(),
                 Architectures = ImmutableList.Create(DpkgArchitecture.Source),
                 IncludeBinaryPackagesOfSourcePackages = false,
             };
@@ -89,6 +87,11 @@ public class StatusCommand: Command
                     {
                         PpaOwner = "dotnet",
                         PpaName = "backports",
+                    },
+                    new LaunchpadPpaDpkgReleaseStateProvider(httpClientFactory)
+                    {
+                        PpaOwner = "dotnet",
+                        PpaName = "previews",
                     },
                     new UbuntuQueueReleaseStateProvider(httpClientFactory),
                 ]
