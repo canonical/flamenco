@@ -88,6 +88,7 @@ apps:
       X_DEBIAN_MULTIARCH_TRIPLET: $CRAFT_ARCH_TRIPLET_BUILD_FOR
     command: launcher.bash
     plugs:
+      - network
       - home
       - removable-media
       - dotnet-runtime-80
