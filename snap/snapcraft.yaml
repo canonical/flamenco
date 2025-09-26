@@ -51,11 +51,12 @@ parts:
       craftctl default
     override-prime: |
       craftctl default
+      mv "$CRAFT_PRIME"/Flamenco.Console "$CRAFT_PRIME"/flamenco
       
       # needed by dpkg-genbuildinfo:
       cp /var/lib/dpkg/status $CRAFT_PRIME/var/lib/dpkg/
       
-      cd $CRAFT_PRIME/usr/bin 
+      cd "$CRAFT_PRIME"/usr/bin 
       
       # when you run 'snapcraft pack' twice it complains that fakeroot
       # already exists due to the re-used build environment

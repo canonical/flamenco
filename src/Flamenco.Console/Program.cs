@@ -21,6 +21,7 @@ public static class Program
     private static RootCommand BuildRootCommand()
     {
         var rootCommand = new RootCommand(description: "Provides tooling for maintainers of .NET Ubuntu packages.");
+        rootCommand.Name = "flamenco";
         rootCommand.AddCommand(new PackCommand());
         rootCommand.AddCommand(new StatusCommand());
         

@@ -51,7 +51,6 @@ public class PackCommand : Command
             return -1;
         }
 #endif
-        
         var sourceDirectoryInfoResult = SourceDirectoryInfo.FromDirectory(sourceDirectory);
         Log.Annotations(sourceDirectoryInfoResult);
         if (sourceDirectoryInfoResult.IsFailure)

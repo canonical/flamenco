@@ -6,4 +6,4 @@ if ! snapctl is-connected dotnet-runtime-80; then
   exit 1
 fi
 
-"$SNAP"/Flamenco.Console "$@"
+"$SNAP"/flamenco "$@"

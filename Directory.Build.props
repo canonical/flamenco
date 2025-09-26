@@ -4,6 +4,6 @@
         <LangVersion>12</LangVersion>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
-        <DefineConstants Condition="'$(Configuration)' == 'Debug'">SNAPCRAFT</DefineConstants>
+        <!--<DefineConstants Condition="'$(Configuration)' == 'Debug'">SNAPCRAFT</DefineConstants>-->
     </PropertyGroup>
 </Project>
