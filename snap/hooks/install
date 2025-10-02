@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+if [ ! -d "$(ls -A "$SNAP_COMMON"/dpkg)" ]; then
+  cp --recursive "$SNAP"/etc/dpkg "$SNAP_COMMON"/
+fi

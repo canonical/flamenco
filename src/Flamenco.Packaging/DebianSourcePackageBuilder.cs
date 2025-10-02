@@ -168,17 +168,7 @@ public class DebianSourcePackageBuilder
                     CreateNoWindow = true,
                 },
             };
-#if SNAPCRAFT
-            string snapRoot = Environment.GetEnvironmentVariable("SNAP") 
-                              ?? throw new UnreachableException("Could not find SNAP environment variable.");
-            
-            // dpkg-genbuildinfo tries to search outside the snap confinement by default
-            dpkgBuildPackage.StartInfo.ArgumentList.Add($"--buildinfo-option=--admindir={snapRoot}/var/lib/dpkg");
-            
-            // fix perl applications in snap confinement, see also:
-            // https://forum.snapcraft.io/t/the-perl-launch-launcher-fix-perl-applications-in-the-snap-runtime/11736
-            dpkgBuildPackage.StartInfo.Environment.Add("PERLLIB", GetPerlLibraryPaths(snapRoot));
-#endif
+
             dpkgBuildPackage.Start();
             await dpkgBuildPackage.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
 
@@ -203,38 +193,6 @@ public class DebianSourcePackageBuilder
                     innerAnnotations: ImmutableList.Create<IAnnotation>(new ExceptionalAnnotation(exception))));
         }
     }
-
-#if SNAPCRAFT
-    private static string GetPerlLibraryPaths(string snapRoot)
-    {
-        List<string> perlLibraryPaths =  [];
-        string debianMultiarchTriplet = Environment.GetEnvironmentVariable("X_DEBIAN_MULTIARCH_TRIPLET") ?? string.Empty;
-        
-        string[] staticSearchPaths = [
-                $"{snapRoot}/usr/lib/{debianMultiarchTriplet}/perl-base",
-                $"{snapRoot}/usr/share/perl5",
-                $"{snapRoot}/etc/perl",
-                $"{snapRoot}/usr/local/lib/site_perl",
-            ];
-        perlLibraryPaths.AddRange(
-            staticSearchPaths
-            .Where(Directory.Exists));
-        
-        string[] dynamicSearchPaths = [
-            $"{snapRoot}/usr/lib/{debianMultiarchTriplet}/perl",
-            $"{snapRoot}/usr/lib/{debianMultiarchTriplet}/perl5",
-            $"{snapRoot}/usr/share/perl",
-            $"{snapRoot}/usr/local/lib/{debianMultiarchTriplet}/perl",
-            $"{snapRoot}/usr/local/share/perl",
-        ];
-        perlLibraryPaths.AddRange(
-            dynamicSearchPaths
-            .Where(Directory.Exists)
-            .SelectMany(Directory.GetDirectories));
-
-        return string.Join(':', perlLibraryPaths);
-    }
-#endif
     
     private async Task<Result> RecursivelyCopyMatchingFilesAsync(
         DirectoryInfo sourceDirectory,

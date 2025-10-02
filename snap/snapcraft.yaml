@@ -26,6 +26,10 @@ platforms:
     build-for:
       - arm64
 
+assumes:
+  - snap-env
+  - common-data-dir
+
 parts:
   flamenco:
     source: .
@@ -37,42 +41,59 @@ parts:
     build-packages:
       - git
       - distro-info-data
-    stage-packages:
-      - dpkg      # needed by dpkg-buildpackage
-      - dpkg-dev  # needed for dpkg-buildpackage
-      - fakeroot  # needed by dpkg-buildpackage
-      - libicu74  # needed by .NET runtime
-      - tar       # needed by dpkg-buildpackage
-      - xz-utils  # needed by dpkg-buildpackage
     override-build: |
       FLAMENCO_VERSION="$(cat src/Flamenco.Console/Flamenco.Console.csproj | grep \<Version\> | awk -F'[<>]' '{print $3}')"
       GIT_HASH="$(git rev-parse --short HEAD)"
       craftctl set version="${FLAMENCO_VERSION}+git.${GIT_HASH}"
       craftctl default
+    organize:
+      "*":
+        usr/lib/flamenco/
     override-prime: |
       craftctl default
-      mv "$CRAFT_PRIME"/Flamenco.Console "$CRAFT_PRIME"/flamenco
-      
+      mv "$CRAFT_PRIME"/usr/lib/flamenco/Flamenco.Console "$CRAFT_PRIME"/usr/lib/flamenco/flamenco
+
+  dpkg-buildpackage-dependencies:
+    plugin: nil
+    build-packages:
+      - base-files
+    stage-packages:
+      - dpkg
+      - dpkg-dev
+      - fakeroot
+      - gcc
+      - tar
+      - xz-utils
+    override-build: |
       # needed by dpkg-genbuildinfo:
-      cp /var/lib/dpkg/status $CRAFT_PRIME/var/lib/dpkg/
-      
-      cd "$CRAFT_PRIME"/usr/bin 
-      
-      # when you run 'snapcraft pack' twice it complains that fakeroot
-      # already exists due to the re-used build environment
-      if [ ! -f fakeroot ]; then
-        ln --symbolic fakeroot-sysv fakeroot
-      fi
-      
-      # fix perl shbang of dpkg-* scripts for snap confinement
-      for script in dpkg-*; do
-        sed -i '1 s|#!/usr/bin/perl|#!/usr/bin/env perl|' "$script"
-      done
+      cp --recursive /etc/dpkg "$CRAFT_PART_INSTALL"/etc
+      cp /var/lib/dpkg/status "$CRAFT_PART_INSTALL"/var/lib/dpkg/
+
   launcher:
     source: snap/local
     plugin: dump
-    stage:
-      - launcher.bash
+    organize:
+      launcher.bash: usr/bin/flamenco
+
+layout:
+  /etc/dpkg:
+    bind: $SNAP_COMMON/dpkg
+  /etc/perl:
+    bind: $SNAP/etc/perl
+  /usr/bin/fakeroot:
+    symlink: $SNAP/usr/bin/fakeroot-sysv
+  /usr/bin/perl:
+    symlink: $SNAP/usr/bin/perl
+  /usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/perl-base:
+    bind: $SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/perl-base
+  /usr/share/dpkg:
+    bind: $SNAP/usr/share/dpkg
+  /usr/share/perl:
+    bind: $SNAP/usr/share/perl
+  /usr/share/perl5:
+    bind: $SNAP/usr/share/perl5
+  /var/lib/dpkg:
+    bind: $SNAP/var/lib/dpkg
   
 plugs:
   dotnet-runtime-80:
@@ -85,8 +106,9 @@ apps:
   flamenco:
     environment:
       DOTNET_ROOT: $SNAP/opt/dotnet8/dotnet
+      DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "1"
       X_DEBIAN_MULTIARCH_TRIPLET: $CRAFT_ARCH_TRIPLET_BUILD_FOR
-    command: launcher.bash
+    command: usr/bin/flamenco
     plugs:
       - network
       - home
@@ -96,4 +118,4 @@ apps:
 lint:
   ignore: 
     - library:
-      - libicu*
+      - lib*
