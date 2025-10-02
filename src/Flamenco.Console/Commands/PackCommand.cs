@@ -1,77 +1,78 @@
 using System.CommandLine;
-using System.CommandLine.NamingConventionBinder;
 using Flamenco.Packaging;
 
 namespace Flamenco.Console.Commands;
 
 public class PackCommand : Command
 {
-    private static readonly Option<TarballCompressionMethod> DebianTarballCompressionMethodOption = new (
-        name: "--debian-tarball-compression-method",
-        description: "The compression method used to create debian tar archives. [default: xz]")
+    private static readonly Option<TarballCompressionMethod?> DebianTarballCompressionMethodOption = new(
+        name: "--debian-tarball-compression-method")
     {
         Arity = ArgumentArity.ExactlyOne,
+        Description = "The compression method used to create debian tar archives. [default: xz]"
     };
     
-    private static readonly Option<bool> DebianTreeOnlyOption = new (
-        name: "--debian-tree-only",
-        description: "Only generate the debian directory within the source tree without extracting the " +
-                     ".orig tarball or invoking dpkg-buildpackage. [default: false]",
-        getDefaultValue: () => false)
+    private static readonly Option<bool> DebianTreeOnlyOption = new(
+        name: "--debian-tree-only")
     {
         Arity = ArgumentArity.ZeroOrOne,
+        DefaultValueFactory = _ => false,
+        Description = "Only generate the debian directory within the source tree without extracting the " +
+                      ".orig tarball or invoking dpkg-buildpackage.", 
     };
     
-    private static readonly Option<bool> SourceTreeOnlyOption = new (
-        name: "--source-tree-only",
-        description: "Only generate the complete debian source directory without " +
-                     "invoking dpkg-buildpackage. [default: false]",
-        getDefaultValue: () => false)
+    private static readonly Option<bool> SourceTreeOnlyOption = new(
+        name: "--source-tree-only")
     {
         Arity = ArgumentArity.ZeroOrOne,
+        DefaultValueFactory = _ => false,
+        Description = "Only generate the complete debian source directory without " +
+                      "invoking dpkg-buildpackage.",
     };
     
-    private static readonly Option<bool> ExcludeOrigTarballOption = new (
-        name: "--exclude-orig-tarball",
-        description: "Exclude the .orig tarball from the generated .changes file. [default: false]",
-        getDefaultValue: () => false)
+    private static readonly Option<bool> ExcludeOrigTarballOption = new(
+        name: "--exclude-orig-tarball")
     {
         Arity = ArgumentArity.ZeroOrOne,
+        DefaultValueFactory = _ => false,
+        Description = "Exclude the .orig tarball from the generated .changes file.",
+    };
+    
+    private static readonly Argument<string[]> TargetArguments = new(
+        name: "targets")
+    {
+        Arity = ArgumentArity.ZeroOrMore,
+        Description = "The packaging targets that should be produced. A packaging target is in the " +
+                      "format 'PACKAGE:SERIES' (e.g. 'dotnet8:noble'). If no packaging target " +
+                      "is specified all packageable targets in the source directory will be selected.",
     };
     
     public PackCommand() : base(
         name: "pack", 
         description: "Packages the debian tarball(s) for specific packages and series from a provided source directory.")
     {
-        var targetArguments = new Argument<string[]>(
-            name: "targets", 
-            description: "The packaging targets that should be produced. A packaging target is in the " +
-                         "format 'PACKAGE:SERIES' (e.g. 'dotnet8:noble'). If no packaging target " +
-                         "is specified all packageable targets in the source directory will be selected.")
-        {
-            Arity = ArgumentArity.ZeroOrMore,
-        };
-
-        AddArgument(targetArguments);
-        AddOption(CommonOptions.SourceDirectoryOption);
-        AddOption(CommonOptions.DestinationDirectoryOption);
-        AddOption(DebianTarballCompressionMethodOption);
-        AddOption(DebianTreeOnlyOption);
-        AddOption(SourceTreeOnlyOption);
-        AddOption(ExcludeOrigTarballOption);
-        Handler = CommandHandler.Create(Run);
+        Add(TargetArguments);
+        Add(CommonOptions.SourceDirectoryOption);
+        Add(CommonOptions.DestinationDirectoryOption);
+        Add(DebianTarballCompressionMethodOption);
+        Add(DebianTreeOnlyOption);
+        Add(SourceTreeOnlyOption);
+        Add(ExcludeOrigTarballOption);
+        SetAction(InvokeAsync);
     }
     
-    private static async Task<int> Run(
-        string[] targets, 
-        DirectoryInfo? sourceDirectory,
-        DirectoryInfo? destinationDirectory,
-        TarballCompressionMethod? debianTarballCompressionMethod,
-        bool debianTreeOnly,
-        bool sourceTreeOnly,
-        bool excludeOrigTarball,
+    private static async Task<int> InvokeAsync(
+        ParseResult parseResult,
         CancellationToken cancellationToken = default)
     {
+        string[] targets = parseResult.GetRequiredValue(TargetArguments);
+        DirectoryInfo? sourceDirectory = parseResult.GetValue(CommonOptions.SourceDirectoryOption); 
+        DirectoryInfo? destinationDirectory = parseResult.GetValue(CommonOptions.DestinationDirectoryOption);
+        TarballCompressionMethod? debianTarballCompressionMethod = parseResult.GetValue(DebianTarballCompressionMethodOption);
+        bool debianTreeOnly = parseResult.GetRequiredValue(DebianTreeOnlyOption);
+        bool sourceTreeOnly = parseResult.GetRequiredValue(SourceTreeOnlyOption);
+        bool excludeOrigTarball = parseResult.GetRequiredValue(ExcludeOrigTarballOption);
+        
         if (!EnvironmentVariables.TryGetSourceDirectoryInfoFromEnvironmentOrDefaultIfNull(ref sourceDirectory) ||
             !EnvironmentVariables.TryGetDestinationDirectoryInfoFromEnvironmentOrDefaultIfNull(ref destinationDirectory) ||
             !EnvironmentVariables.TryGetDebianTarballCompressionMethodFromEnvironmentOrDefaultIfNull(ref debianTarballCompressionMethod)) 
@@ -90,14 +91,13 @@ public class PackCommand : Command
         Log.Debug("Destination Directory: " + destinationDirectory.FullName);
         Log.Debug("Build Output: " + buildOutput.ToString());
         
-#if SNAPCRAFT
         if (!await Program.IsPathAccessibleAsync(sourceDirectory.FullName, cancellationToken) || 
             !await Program.IsPathAccessibleAsync(destinationDirectory.FullName, cancellationToken))
         {
             Log.Fatal("Aborting the packaging process, because some paths are not accessible.");
             return -1;
         }
-#endif
+
         var sourceDirectoryInfoResult = SourceDirectoryInfo.FromDirectory(sourceDirectory);
         Log.Annotations(sourceDirectoryInfoResult);
         if (sourceDirectoryInfoResult.IsFailure)
@@ -239,7 +239,6 @@ public class PackCommand : Command
             targetCollection.Add(new BuildTarget(PackageName: targetComponents[0], SeriesName: targetComponents[1]));
         }
         
-        // we want to fail only after checking the format of all changelog files 
         if (errorDetected) return null;
         
         return targetCollection;

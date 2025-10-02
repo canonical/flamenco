@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using System.CommandLine;
-using System.CommandLine.NamingConventionBinder;
 using Flamenco.Distro.ReleaseInfo;
 using Flamenco.Distro.Services.Abstractions;
 using Flamenco.Distro.Services.Launchpad.ReleaseStateProviders;
@@ -16,26 +15,26 @@ public class StatusCommand: Command
 {
     public StatusCommand() : base(name: "status", description: "")
     {
-        AddOption(CommonOptions.SourceDirectoryOption);
-        Handler = CommandHandler.Create(Run);
+        Add(CommonOptions.SourceDirectoryOption);
+        SetAction(InvokeAsync);
     }
     
-    private static async Task<int> Run(
-        DirectoryInfo? sourceDirectory,
+    private static async Task<int> InvokeAsync(
+        ParseResult parseResult,
         CancellationToken cancellationToken = default)
     {
+        DirectoryInfo? sourceDirectory = parseResult.GetValue(CommonOptions.SourceDirectoryOption);
+        
         if (!EnvironmentVariables.TryGetSourceDirectoryInfoFromEnvironmentOrDefaultIfNull(ref sourceDirectory))
         {
             return -1;
         }
-
-#if SNAPCRAFT
+        
         if (!await Program.IsPathAccessibleAsync(sourceDirectory.FullName, cancellationToken))
         {
             Log.Fatal("Aborting the status process, because some paths are not accessible.");
             return -1;
         }
-#endif
 
         Result<SourceDirectoryInfo> sourceDirectoryInfoResult = Result.Success;
         Result<IImmutableList<DpkgPackageReleaseState>> queryReleaseStatesResult = Result.Success;

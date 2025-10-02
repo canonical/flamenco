@@ -1,39 +1,41 @@
 ﻿using System.CommandLine;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using Flamenco.Console.Commands;
 
 namespace Flamenco.Console;
 
 public static class Program
-{
+{   
     public static Task<int> Main(string[] args)
     {
-        try
-        {
-            return BuildRootCommand().InvokeAsync(args);
-        }
-        catch (Exception exception)
-        {
-            return Task.FromException<int>(exception);
-        }
+        var rootCommand = BuildRootCommand();
+        var parsingResult = rootCommand.Parse(args, new ParserConfiguration());
+        return parsingResult.InvokeAsync();
     }
 
     private static RootCommand BuildRootCommand()
     {
-        var rootCommand = new RootCommand(description: "Provides tooling for maintainers of .NET Ubuntu packages.");
-        rootCommand.Name = "flamenco";
-        rootCommand.AddCommand(new PackCommand());
-        rootCommand.AddCommand(new StatusCommand());
-        
+        var rootCommand = new RootCommand(description: "Provides tooling for maintainers of .NET Ubuntu packages.")
+        {
+            new PackCommand(),
+            new StatusCommand()
+        };
+
         return rootCommand;
     }
     
-#if SNAPCRAFT
     private const string SnapHomePlugName = "home";
     private const string SnapRemovableMediaPlugName = "removable-media";
     
+    
+#pragma warning disable CS0162 // Unreachable code detected
+    [SuppressMessage("ReSharper", "HeuristicUnreachableCode")]
     public static async ValueTask<bool> IsPathAccessibleAsync(string path, CancellationToken cancellationToken = default)
     {
+#if ! SNAPCRAFT
+        return true;
+#endif
         string fullPath = Path.GetFullPath(path);
         string? missingConnection = null;
         
@@ -62,6 +64,7 @@ public static class Program
         
         return false;
     }
+#pragma warning restore CS0162 // Unreachable code detected
     
     private static async ValueTask<bool> IsSnapPlugConnectedAsync(
         string interfaceName,
@@ -83,5 +86,4 @@ public static class Program
         await snapctlProcess.WaitForExitAsync(cancellationToken);
         return snapctlProcess.ExitCode == 0;
     }
-#endif
 }
