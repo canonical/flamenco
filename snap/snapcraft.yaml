@@ -69,12 +69,6 @@ parts:
       cp --recursive /etc/dpkg "$CRAFT_PART_INSTALL"/etc
       cp /var/lib/dpkg/status "$CRAFT_PART_INSTALL"/var/lib/dpkg/
 
-  launcher:
-    source: snap/local
-    plugin: dump
-    organize:
-      launcher.bash: usr/bin/flamenco
-
 layout:
   /etc/dpkg:
     bind: $SNAP_COMMON/dpkg
@@ -94,28 +88,20 @@ layout:
     bind: $SNAP/usr/share/perl5
   /var/lib/dpkg:
     bind: $SNAP/var/lib/dpkg
-  
-plugs:
-  dotnet-runtime-80:
-    interface: content
-    content: dotnet-runtime-80
-    target: $SNAP/opt/dotnet8
-    default-provider: dotnet-runtime-80
 
 apps:
   flamenco:
     environment:
-      DOTNET_ROOT: $SNAP/opt/dotnet8/dotnet
       DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "1"
       X_DEBIAN_MULTIARCH_TRIPLET: $CRAFT_ARCH_TRIPLET_BUILD_FOR
-    command: usr/bin/flamenco
+    command: usr/lib/flamenco/flamenco
+    extensions: [ dotnet8 ]
     plugs:
       - network
       - home
       - removable-media
-      - dotnet-runtime-80
 
 lint:
-  ignore: 
+  ignore:
     - library:
       - lib*
