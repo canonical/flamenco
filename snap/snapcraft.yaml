@@ -78,6 +78,8 @@ layout:
     symlink: $SNAP/usr/bin/fakeroot-sysv
   /usr/bin/perl:
     symlink: $SNAP/usr/bin/perl
+  /usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/perl:
+    bind: $SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/perl
   /usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/perl-base:
     bind: $SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/perl-base
   /usr/share/dpkg:
