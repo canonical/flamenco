@@ -58,7 +58,7 @@ jobs:
 
   build-snap:
     name: build flamenco snap
-    needs: 
+    needs:
       - shellcheck
       - test
     strategy:
@@ -76,6 +76,11 @@ jobs:
       - name: run snapcraft pack
         id: snapcraft
         uses: snapcore/action-build@v1
+        env:
+          SNAPCRAFT_ENABLE_EXPERIMENTAL_EXTENSIONS: "1"
+        with:
+          snapcraft-channel: latest/edge
+          snapcraft-args: --verbose
       - name: upload snap to workflow artifacts
         id: upload-artifact
         uses: actions/upload-artifact@v4
