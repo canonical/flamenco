@@ -58,10 +58,16 @@ parts:
     build-packages:
       - base-files
     stage-packages:
+      - bash
       - dpkg
       - dpkg-dev
       - fakeroot
       - gcc
+      - gnupg
+      - gnupg-agent
+      - libgpg-error0
+      - pinentry-curses
+      - pinentry-gnome3
       - tar
       - xz-utils
     override-build: |
@@ -90,18 +96,38 @@ layout:
     bind: $SNAP/usr/share/perl5
   /var/lib/dpkg:
     bind: $SNAP/var/lib/dpkg
-
+  /usr/bin/gpg-agent:
+    symlink: $SNAP/usr/bin/gpg-agent
+  
 apps:
+  bash:
+    environment:
+      GNUPGHOME: $SNAP_REAL_HOME/.gnupg
+    command: usr/bin/bash
+    plugs:
+      - network
+      - network-bind
+      - home
+      - removable-media
+      - gpg-keys
+      - desktop
+      - password-manager-service
+    
   flamenco:
     environment:
+      GNUPGHOME: $SNAP_REAL_HOME/.gnupg
       DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "1"
       X_DEBIAN_MULTIARCH_TRIPLET: $CRAFT_ARCH_TRIPLET_BUILD_FOR
     command: usr/lib/flamenco/flamenco
     extensions: [ dotnet8 ]
     plugs:
       - network
+      - network-bind
       - home
       - removable-media
+      - gpg-keys
+      - desktop
+      - password-manager-service
 
 lint:
   ignore:
