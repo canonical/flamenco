@@ -524,8 +524,17 @@ public class DebianSourcePackageBuilder
         switch (type)
         {
             case "external_source":
-                var externalSource = ExternalSources.ExternalSourceBase.Create(fileInfo.FileInfo);
-                await externalSource.Download(destinationDirectory.FullName, cancellationToken);
+                try
+                {
+                    var externalSource = ExternalSources.ExternalSourceBase.Create(fileInfo.FileInfo);
+                    await externalSource.Download(destinationDirectory.FullName, cancellationToken);
+                }
+                catch (Exception e)
+                {
+                    return new CouldNotCreateFlamencoFileDescriptor(
+                        filePath: fileInfo.FileInfo.FullName,
+                        exception: e);
+                }
                 break;
             default:
                 return result.WithAnnotation(new InvalidFlamencoFileType(
@@ -749,6 +758,18 @@ public class DebianSourcePackageBuilder
             title: "Invalid Flamenco file type",
             message: $"The Flamenco file '{filePath}' has an invalid or unsupported type '{type ?? "null"}'",
             locations: ImmutableList.Create(new Location { ResourceLocator = filePath }))
+    {
+    }
+
+    public class CouldNotCreateFlamencoFileDescriptor(
+        string filePath,
+        Exception exception)
+        : ErrorBase(
+            identifier: "FL0042",
+            title: "Could not create Flamenco file descriptor",
+            message: $"Could not create Flamenco file descriptor from file.",
+            locations: ImmutableList.Create(new Location { ResourceLocator = filePath }),
+            innerAnnotations: ImmutableList.Create<IAnnotation>(new ExceptionalAnnotation(exception)))
     {
     }
 }
