@@ -10,34 +10,36 @@
 
 using System.Collections.Immutable;
 using System.Diagnostics;
-using System.Text;
+using System.Text.Json.Nodes;
 using Flamenco.Packaging.Dpkg;
 
 namespace Flamenco.Packaging;
 
 public class DebianSourcePackageBuilder
 {
+    private const string FlamencoFileName = "flamenco.json";
+
     public required BuildTarget BuildTarget { get; set; }
-    
+
     public required SourceDirectoryInfo SourceDirectory { get; set; }
-    
+
     public required DirectoryInfo DestinationDirectory { get; set; }
-    
+
     public required TarballCompressionMethod TarballCompressionMethod { get; set; }
-    
+
     public required ITarArchivingServiceProvider TarArchivingServiceProvider { get; set; }
-    
+
     public required BuildOutput BuildOutput { get; set; }
-    
+
     public async ValueTask<Result> BuildDebianSourcePackageAsync(CancellationToken cancellationToken = default)
     {
         var result = new Result();
-        var readFirstChangelogEntryResult = 
+        var readFirstChangelogEntryResult =
             await SourceDirectory.ReadFirstChangelogEntryAsync(BuildTarget, cancellationToken).ConfigureAwait(false);
         result = result.Merge(readFirstChangelogEntryResult);
         if (readFirstChangelogEntryResult.IsFailure) return result;
         var changelogEntry = readFirstChangelogEntryResult.Value;
-            
+
         if (changelogEntry.PackageName.Identifier != BuildTarget.PackageName)
         {
             result = result.WithAnnotation(new ChangelogFileNameAndContentMismatch(
@@ -68,7 +70,7 @@ public class DebianSourcePackageBuilder
                     buildTarget: BuildTarget,
                     distributions: changelogEntry.Distributions,
                     location: changelogEntry.Location));
-                
+
                 if (!changelogEntry.Distributions.Any(series => series.Series.Identifier == BuildTarget.SeriesName))
                 {
                     result = result.WithAnnotation(new ChangelogFileNameAndContentMismatch(
@@ -78,17 +80,17 @@ public class DebianSourcePackageBuilder
                 }
                 break;
         }
-        
+
         var destinationDebianDirectory = new DirectoryInfo(Path.Combine(
             DestinationDirectory.FullName,
-            $"{BuildTarget.PackageName}-{changelogEntry.Version}", 
+            $"{BuildTarget.PackageName}-{changelogEntry.Version}",
             "debian"));
 
         var origTarball = new FileInfo(Path.Combine(
             DestinationDirectory.FullName,
             $"{changelogEntry.PackageName}_{changelogEntry.Version.UpstreamVersion}" +
             $".orig.tar{TarballCompressionMethod.FileExtension()}"));
-        
+
         return await result
             .Then(() => CheckOrigTarballExists(origTarball))
             .Then(() => RecursivelyCopyMatchingFilesAsync(
@@ -109,13 +111,13 @@ public class DebianSourcePackageBuilder
     private Result CheckOrigTarballExists(FileInfo origTarball)
     {
         var result = Result.Success;
-        
+
         if (BuildOutput != BuildOutput.DebianDirectoryOnly && !origTarball.Exists)
         {
             return result.WithAnnotation(new OrigTarballNotFound(
                 BuildTarget, new Location { ResourceLocator = origTarball.FullName }));
         }
-        
+
         return result;
     }
 
@@ -133,15 +135,15 @@ public class DebianSourcePackageBuilder
     };
 
     private async Task<Result> RunDpkgBuildPackageAsync(
-        DirectoryInfo sourceTreeDirectory, 
-        BuildTarget buildTarget, 
+        DirectoryInfo sourceTreeDirectory,
+        BuildTarget buildTarget,
         CancellationToken cancellationToken)
     {
         if (BuildOutput is BuildOutput.DebianDirectoryOnly or BuildOutput.DebianSourceTreeOnly)
         {
             return Result.Success;
         }
-        
+
         try
         {
             var origTarballInclusionArgument = BuildOutput switch
@@ -150,15 +152,15 @@ public class DebianSourcePackageBuilder
                 BuildOutput.SourcePackageExcludingOrigTarball => "-sd",
                 _ => throw new UnreachableException($"The build output type '{BuildOutput}' is not supported.")
             };
-            
+
             var dpkgBuildPackage = new Process()
             {
                 StartInfo = new ProcessStartInfo(
                     fileName: "/usr/bin/env",
                     arguments: [
-                        "dpkg-buildpackage", 
+                        "dpkg-buildpackage",
                         "--build=source",
-                        "--no-pre-clean", 
+                        "--no-pre-clean",
                         "--no-check-builddeps",
                         origTarballInclusionArgument,
                     ])
@@ -176,8 +178,8 @@ public class DebianSourcePackageBuilder
             {
                 return new Result().WithAnnotation(
                     new DpkgBuildPackageFailed(
-                        buildTarget: buildTarget, 
-                        location: new Location { ResourceLocator = sourceTreeDirectory.FullName }, 
+                        buildTarget: buildTarget,
+                        location: new Location { ResourceLocator = sourceTreeDirectory.FullName },
                         reason: $"Exit code '{dpkgBuildPackage.ExitCode}' is non zero"));
             }
 
@@ -187,13 +189,13 @@ public class DebianSourcePackageBuilder
         {
             return new Result().WithAnnotation(
                 new DpkgBuildPackageFailed(
-                    reason: $"Unexpected exception '{exception.GetType().FullName}'. {exception.Message}", 
-                    buildTarget: buildTarget, 
-                    location: new Location { ResourceLocator = sourceTreeDirectory.FullName }, 
+                    reason: $"Unexpected exception '{exception.GetType().FullName}'. {exception.Message}",
+                    buildTarget: buildTarget,
+                    location: new Location { ResourceLocator = sourceTreeDirectory.FullName },
                     innerAnnotations: ImmutableList.Create<IAnnotation>(new ExceptionalAnnotation(exception))));
         }
     }
-    
+
     private async Task<Result> RecursivelyCopyMatchingFilesAsync(
         DirectoryInfo sourceDirectory,
         DirectoryInfo destinationDirectory,
@@ -224,15 +226,15 @@ public class DebianSourcePackageBuilder
             })
             .ConfigureAwait(false);
     }
-    
+
     private Result CreateDestinationDirectory(DirectoryInfo destinationDirectory, CancellationToken cancellationToken = default)
     {
         if (cancellationToken.IsCancellationRequested) return new OperationCanceled();
-        
+
         if (destinationDirectory.Exists)
         {
             Result result = new OutputDirectoryAlreadyExists(destinationDirectory);
-            
+
             if (destinationDirectory.EnumerateFiles().Any() || destinationDirectory.EnumerateDirectories().Any())
             {
                 result = result.WithAnnotation(new OutputDirectoryContainsFiles(destinationDirectory));
@@ -240,7 +242,7 @@ public class DebianSourcePackageBuilder
 
             return result;
         }
-        
+
         try
         {
             destinationDirectory.Create();
@@ -251,13 +253,13 @@ public class DebianSourcePackageBuilder
             return new CreatingOutputDirectoryFailed(destinationDirectory, exception);
         }
     }
-    
-    private Result<ImmutableDictionary<string, FileInfo>> IndexSourceFiles(
-        DirectoryInfo sourceDirectory, 
+
+    private Result<ImmutableDictionary<string, FlamencoFileInfo>> IndexSourceFiles(
+        DirectoryInfo sourceDirectory,
         CancellationToken cancellationToken = default)
     {
         var result = new Result();
-        var destinationFiles = new Dictionary<string, (FileInfo Info, int BuildTargetSpecificity)>();
+        var destinationFiles = new Dictionary<string, (FlamencoFileInfo Info, int BuildTargetSpecificity)>();
 
         foreach (var file in sourceDirectory.EnumerateFiles())
         {
@@ -274,18 +276,22 @@ public class DebianSourcePackageBuilder
                     {
                         if (fileContext.BuildTargetSpecificity > otherFile.BuildTargetSpecificity)
                         {
-                            destinationFiles[fileContext.FileName] = (file, fileContext.BuildTargetSpecificity);
+                            destinationFiles[fileContext.FileName] = (
+                                new FlamencoFileInfo(fileContext.FlamencoFile, file),
+                                fileContext.BuildTargetSpecificity);
                         }
                         else if (fileContext.BuildTargetSpecificity == otherFile.BuildTargetSpecificity)
                         {
                             return new ConflictingBuildTargetSpecificity(
                                 conflictingFilePath1: file.FullName,
-                                conflictingFilePath2: otherFile.Info.FullName);
+                                conflictingFilePath2: otherFile.Info.FileInfo.FullName);
                         }
                     }
                     else
                     {
-                        destinationFiles[fileContext.FileName] = (file, fileContext.BuildTargetSpecificity);
+                        destinationFiles[fileContext.FileName] = (
+                            new FlamencoFileInfo(fileContext.FlamencoFile, file),
+                            fileContext.BuildTargetSpecificity);
                     }
 
                     return Result.Success;
@@ -293,38 +299,39 @@ public class DebianSourcePackageBuilder
             );
         }
 
-        return result.Then<ImmutableDictionary<string, FileInfo>>(
+        return result.Then<ImmutableDictionary<string, FlamencoFileInfo>>(
             () => destinationFiles.ToImmutableDictionary(
                 keySelector: e => e.Key,
                 elementSelector: e => e.Value.Info));
     }
-    
-    private Result<(string FileName, int BuildTargetSpecificity)> AnalyzeFileExtension(FileInfo file)
+
+    private Result<(string FileName, bool FlamencoFile, int BuildTargetSpecificity)> AnalyzeFileExtension(FileInfo file)
     {
         var result = new Result();
-        
+
         string[] fileExtensions = file.Name.Split('.');
         // Remember, that fileExtensions[0] is just the file name!
 
-        if (fileExtensions.Length < 2) 
+        if (fileExtensions.Length < 2)
         {
-            return result.WithValue((file.Name, BuildTargetSpecificity: 0));    
+            return result.WithValue((file.Name, FlamencoFile: false, BuildTargetSpecificity: 0));
         }
 
+        bool flamencoFile = false;
         bool matchesTarget = true;
         bool packageNameIsDefined = false;
         bool seriesNameIsDefined = false;
-        
+
         string extensionName;
         string[] extensionNames;
         int totalExtensionLength = 0;
-        
+
         if (fileExtensions.Length >= 2)
         {
             extensionName = fileExtensions[^1];
             extensionNames = extensionName.Split(',');
             totalExtensionLength = extensionName.Length + 1;
-            
+
             if (SourceDirectory.BuildableTargets.PackageNames.Any(extensionNames.Contains))
             {
                 packageNameIsDefined = true;
@@ -337,12 +344,13 @@ public class DebianSourcePackageBuilder
             }
             else
             {
-                return result.WithValue((file.Name, BuildTargetSpecificity: 0));
+                flamencoFile = file.Name.Equals(FlamencoFileName, StringComparison.CurrentCultureIgnoreCase);
+                return result.WithValue((file.Name, flamencoFile, BuildTargetSpecificity: 0));
             }
         }
 
         int buildTargetSpecificity;
-        
+
         if (fileExtensions.Length >= 3)
         {
             extensionName = fileExtensions[^2];
@@ -367,7 +375,7 @@ public class DebianSourcePackageBuilder
                 }
 
                 result = result.WithAnnotation(new NonStandardFileExtensionFormat(file.FullName));
-                
+
                 seriesNameIsDefined = true;
                 matchesTarget = matchesTarget && extensionNames.Contains(BuildTarget.SeriesName);
                 totalExtensionLength += extensionName.Length + 1;
@@ -376,6 +384,13 @@ public class DebianSourcePackageBuilder
 
         string fileName = file.Name.Substring(startIndex: 0, length: file.Name.Length - totalExtensionLength);
 
+        flamencoFile = fileName.Equals(FlamencoFileName, StringComparison.CurrentCultureIgnoreCase);
+
+        // A specificity score that determines how specific a file is to a source package or series.
+        // A specificity of -1 means that the file is not specific to current build target.
+        // A specificity of 0 means that the file is not specific to a source package or series.
+        // A specificity of 1 means that the file is specific to either a source package or a series.
+        // A specificity of 2 means that the file is specific to both a source package and a series.
         if (!matchesTarget)
         {
             buildTargetSpecificity = -1;
@@ -388,18 +403,18 @@ public class DebianSourcePackageBuilder
         {
             buildTargetSpecificity = 1;
         }
-        
-        return result.WithValue((fileName, buildTargetSpecificity));
+
+        return result.WithValue((fileName, flamencoFile, buildTargetSpecificity));
     }
 
     private async Task<Result> CopySourceFilesToDestinationDirectoryAsync(
         DirectoryInfo sourceDirectory,
-        ImmutableDictionary<string, FileInfo> sourceFileIndex,
+        ImmutableDictionary<string, FlamencoFileInfo> sourceFileIndex,
         DirectoryInfo destinationDirectory,
         CancellationToken cancellationToken = default)
     {
         var result = Result.Success;
-        
+
         if (IsPatchesDirectory(sourceDirectory))
         {
             if (!sourceFileIndex.TryGetValue("series", out var seriesFile))
@@ -408,23 +423,23 @@ public class DebianSourcePackageBuilder
             }
 
             result = result.Merge(CopyFile(
-                sourceFile: seriesFile, 
-                destinationDirectory: destinationDirectory, 
+                sourceFile: seriesFile.FileInfo,
+                destinationDirectory: destinationDirectory,
                 fileName: "series"));
 
             if (result.IsFailure) return result;
 
             StreamReader seriesFileTextReader;
-            
+
             try
             {
-                seriesFileTextReader = seriesFile.OpenText();
+                seriesFileTextReader = seriesFile.FileInfo.OpenText();
             }
             catch (Exception exception)
             {
                 return result.WithAnnotation(new ReadingPatchesSeriesFileFailed(
-                    message: $"Opening the patches/series file '{seriesFile.FullName}' failed",
-                    location: new Location { ResourceLocator = seriesFile.FullName },
+                    message: $"Opening the patches/series file '{seriesFile.FileInfo.FullName}' failed",
+                    location: new Location { ResourceLocator = seriesFile.FileInfo.FullName },
                     exception: exception));
             }
 
@@ -448,15 +463,15 @@ public class DebianSourcePackageBuilder
                     catch (Exception exception)
                     {
                         return result.WithAnnotation(new ReadingPatchesSeriesFileFailed(
-                            message: $"Reading from the patches/series file '{seriesFile.FullName}' failed",
+                            message: $"Reading from the patches/series file '{seriesFile.FileInfo.FullName}' failed",
                             location: new Location
                             {
-                                ResourceLocator = seriesFile.FullName, 
+                                ResourceLocator = seriesFile.FileInfo.FullName,
                                 TextSpan = new LinePositionSpan(new LinePosition(lineNumber))
                             },
                             exception: exception));
                     }
-                    
+
                     if (line == null) return result;
                     if (string.IsNullOrWhiteSpace(line) || line.StartsWith('#')) continue;
 
@@ -465,12 +480,13 @@ public class DebianSourcePackageBuilder
                     // TODO: handle patches in subdirectories
                     if (!sourceFileIndex.TryGetValue(patchFilePath, out var patchFile))
                     {
-                        return result.WithAnnotation(new CouldNotFindPatchFile(seriesFile, lineNumber, patchFilePath));
+                        return result.WithAnnotation(new CouldNotFindPatchFile(seriesFile.FileInfo, lineNumber,
+                            patchFilePath));
                     }
 
                     result = result.Merge(CopyFile(
-                        sourceFile: patchFile, 
-                        destinationDirectory: destinationDirectory, 
+                        sourceFile: patchFile.FileInfo,
+                        destinationDirectory: destinationDirectory,
                         fileName: patchFilePath));
                 }
             }
@@ -481,14 +497,45 @@ public class DebianSourcePackageBuilder
             {
                 if (cancellationToken.IsCancellationRequested) return result.WithAnnotation(new OperationCanceled());
 
-                result = result.Merge(CopyFile(fileInfo, destinationDirectory, fileName));
-                if (result.IsFailure) return result;
-            }  
+                if (fileInfo.FlamencoFile)
+                {
+                    result = result.Merge(await HandleFlamencoFile(fileInfo, destinationDirectory, cancellationToken));
+                }
+                else
+                {
+                    result = result.Merge(CopyFile(fileInfo.FileInfo, destinationDirectory, fileName));
+                                    if (result.IsFailure) return result;
+                }
+            }
         }
-        
+
         return result;
     }
-    
+
+    private async Task<Result> HandleFlamencoFile(FlamencoFileInfo fileInfo, DirectoryInfo destinationDirectory,
+        CancellationToken cancellationToken)
+    {
+        var result = Result.Success;
+
+        var jsonNode = JsonNode.Parse(await File.ReadAllTextAsync(fileInfo.FileInfo.FullName, cancellationToken));
+
+        var type = jsonNode?["type"]?.GetValue<string>();
+
+        switch (type)
+        {
+            case "external_source":
+                var externalSource = ExternalSources.ExternalSourceBase.Create(fileInfo.FileInfo);
+                await externalSource.Download(destinationDirectory.FullName, cancellationToken);
+                break;
+            default:
+                return result.WithAnnotation(new InvalidFlamencoFileType(
+                    filePath: fileInfo.FileInfo.FullName,
+                    type: type));
+        }
+
+        return result;
+    }
+
     private bool IsPatchesDirectory(DirectoryInfo directory)
     {
         var relativePath = Path.GetRelativePath(
@@ -501,7 +548,7 @@ public class DebianSourcePackageBuilder
     private Result CopyFile(FileInfo sourceFile, DirectoryInfo destinationDirectory, string fileName)
     {
         var destinationPath = Path.Combine(destinationDirectory.FullName, fileName);
-                
+
         try
         {
             sourceFile.CopyTo(destinationPath);
@@ -515,7 +562,7 @@ public class DebianSourcePackageBuilder
                 exception);
         }
     }
-    
+
     public class ConflictingBuildTargetSpecificity(
         string conflictingFilePath1,
         string conflictingFilePath2)
@@ -527,7 +574,7 @@ public class DebianSourcePackageBuilder
             locations: ImmutableList.Create(
                 new Location { ResourceLocator = conflictingFilePath1 },
                 new Location { ResourceLocator = conflictingFilePath2 })) {}
-    
+
     public class OutputDirectoryAlreadyExists(
         DirectoryInfo outputDirectory)
         : AnnotationBase(
@@ -537,7 +584,7 @@ public class DebianSourcePackageBuilder
             severity: AnnotationSeverity.Warning,
             warningLevel: WarningLevels.MinorWarning,
             locations: ImmutableList.Create(new Location { ResourceLocator = outputDirectory.FullName })) {}
-        
+
     public class OutputDirectoryContainsFiles(
         DirectoryInfo outputDirectory)
         : ErrorBase(
@@ -545,7 +592,7 @@ public class DebianSourcePackageBuilder
             title: "Output directory contains files",
             message: $"Output directory '{outputDirectory.FullName}' already contains files",
             locations: ImmutableList.Create(new Location { ResourceLocator = outputDirectory.FullName })) {}
-    
+
     public class CreatingOutputDirectoryFailed(
         DirectoryInfo outputDirectory,
         Exception exception)
@@ -555,7 +602,7 @@ public class DebianSourcePackageBuilder
             message: $"An unexpected error occured while creating the output directory '{outputDirectory.FullName}'",
             locations: ImmutableList.Create(new Location { ResourceLocator = outputDirectory.FullName }),
             innerAnnotations: ImmutableList.Create<IAnnotation>(new ExceptionalAnnotation(exception))) {}
-    
+
     public class CreatingOutputFileFailed(
         string sourceFilePath,
         string outputFilePath,
@@ -568,7 +615,7 @@ public class DebianSourcePackageBuilder
             innerAnnotations: ImmutableList.Create<IAnnotation>(new ExceptionalAnnotation(exception)),
             metadata: ImmutableDictionary<string, object?>.Empty
                 .Add(key: "SourceFile", value: sourceFilePath)) {}
-    
+
     public class ConflictingPackageNameFileExtensions(
         string sourceFilePath)
         : ErrorBase(
@@ -576,7 +623,7 @@ public class DebianSourcePackageBuilder
             title: "Conflicting package name file extensions",
             message: $"The file extensions of '{sourceFilePath}' specifies two package names",
             locations: ImmutableList.Create(new Location { ResourceLocator = sourceFilePath })) {}
-    
+
     public class ConflictingSeriesNameFileExtensions(
         string sourceFilePath)
         : ErrorBase(
@@ -584,7 +631,7 @@ public class DebianSourcePackageBuilder
             title: "Conflicting package name file extensions",
             message: $"The file extensions of '{sourceFilePath}' specifies two series names",
             locations: ImmutableList.Create(new Location { ResourceLocator = sourceFilePath })) {}
-    
+
     public class NonStandardFileExtensionFormat(
         string sourceFilePath)
         : AnnotationBase(
@@ -595,7 +642,7 @@ public class DebianSourcePackageBuilder
             severity: AnnotationSeverity.Warning,
             warningLevel: WarningLevels.MinorWarning,
             locations: ImmutableList.Create(new Location { ResourceLocator = sourceFilePath })) {}
-    
+
     public class ChangelogFileNameAndContentMismatch(
         string message,
         Location location)
@@ -606,7 +653,7 @@ public class DebianSourcePackageBuilder
             severity: AnnotationSeverity.Warning,
             warningLevel: WarningLevels.SevereWarning,
             locations: ImmutableList.Create(location)) {}
-    
+
     public class OrigTarballNotFound(
         BuildTarget buildTarget,
         Location location)
@@ -615,7 +662,7 @@ public class DebianSourcePackageBuilder
             title: "Orig tarball not found",
             message: $"Orig tarball for packaging target {buildTarget} could not be found",
             locations: ImmutableList.Create(location)) {}
-    
+
     public class DpkgBuildPackageFailed(
         BuildTarget buildTarget,
         Location location,
@@ -627,7 +674,7 @@ public class DebianSourcePackageBuilder
             message: $"dpkg-buildpackage failed for target {buildTarget}. {reason}",
             locations: ImmutableList.Create(location),
             innerAnnotations: innerAnnotations) {}
-    
+
     public class MultipleTargetDistributionsSpecified(
         BuildTarget buildTarget,
         ImmutableArray<DpkgSuite> distributions,
@@ -644,7 +691,7 @@ public class DebianSourcePackageBuilder
         public BuildTarget BuildTarget => FromMetadata<BuildTarget>(nameof(BuildTarget));
         public ImmutableArray<DpkgSuite> Distributions => FromMetadata<ImmutableArray<DpkgSuite>>(nameof(Distributions));
     }
-    
+
     public class CouldNotFindPatchesSeriesFile(
         BuildTarget buildTarget)
         : ErrorBase(
@@ -656,7 +703,7 @@ public class DebianSourcePackageBuilder
     {
         public BuildTarget BuildTarget => FromMetadata<BuildTarget>(nameof(BuildTarget));
     }
-    
+
     public class ReadingPatchesSeriesFileFailed(
         string message,
         Location location,
@@ -669,7 +716,7 @@ public class DebianSourcePackageBuilder
             innerAnnotations: ImmutableList.Create<IAnnotation>(new ExceptionalAnnotation(exception)))
     {
     }
-    
+
     public class CouldNotFindPatchFile(
         FileInfo seriesFile,
         int seriesFileLineNumber,
@@ -681,17 +728,28 @@ public class DebianSourcePackageBuilder
             locations: ImmutableList.Create(
                 new Location
                 {
-                    ResourceLocator = seriesFile.FullName, 
+                    ResourceLocator = seriesFile.FullName,
                     TextSpan = new LinePositionSpan(new LinePosition(seriesFileLineNumber))
-                }, 
+                },
                 new Location
                 {
                     ResourceLocator = patchFilePath,
                 }))
     {
         public Location SeriesFileLocation => Locations[0];
-        
+
         public Location MissingPatchFileLocation => Locations[1];
-    } 
+    }
+
+    public class InvalidFlamencoFileType(
+        string filePath,
+        string? type)
+        : ErrorBase(
+            identifier: "FL0041",
+            title: "Invalid Flamenco file type",
+            message: $"The Flamenco file '{filePath}' has an invalid or unsupported type '{type ?? "null"}'",
+            locations: ImmutableList.Create(new Location { ResourceLocator = filePath }))
+    {
+    }
 }
 
