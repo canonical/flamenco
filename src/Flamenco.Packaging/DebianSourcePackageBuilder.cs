@@ -19,6 +19,11 @@ public class DebianSourcePackageBuilder
 {
     private const string FlamencoFileName = "flamenco.json";
 
+    private const int FileNotSpecificToCurrentBuildTarget = -1;
+    private const int FileNotSpecificToASourcePackageOrSeries = 0;
+    private const int FileSpecificToEitherSourcePackageOrSeries = 1;
+    private const int FileSpecificToBothSourcePackageAndSeries = 2;
+
     public required BuildTarget BuildTarget { get; set; }
 
     public required SourceDirectoryInfo SourceDirectory { get; set; }
@@ -277,7 +282,7 @@ public class DebianSourcePackageBuilder
                         if (fileContext.BuildTargetSpecificity > otherFile.BuildTargetSpecificity)
                         {
                             destinationFiles[fileContext.FileName] = (
-                                new FlamencoFileInfo(fileContext.FlamencoFile, file),
+                                new FlamencoFileInfo(fileContext.IsFlamencoFile, file),
                                 fileContext.BuildTargetSpecificity);
                         }
                         else if (fileContext.BuildTargetSpecificity == otherFile.BuildTargetSpecificity)
@@ -290,7 +295,7 @@ public class DebianSourcePackageBuilder
                     else
                     {
                         destinationFiles[fileContext.FileName] = (
-                            new FlamencoFileInfo(fileContext.FlamencoFile, file),
+                            new FlamencoFileInfo(fileContext.IsFlamencoFile, file),
                             fileContext.BuildTargetSpecificity);
                     }
 
@@ -305,7 +310,7 @@ public class DebianSourcePackageBuilder
                 elementSelector: e => e.Value.Info));
     }
 
-    private Result<(string FileName, bool FlamencoFile, int BuildTargetSpecificity)> AnalyzeFileExtension(FileInfo file)
+    private Result<(string FileName, bool IsFlamencoFile, int BuildTargetSpecificity)> AnalyzeFileExtension(FileInfo file)
     {
         var result = new Result();
 
@@ -314,10 +319,11 @@ public class DebianSourcePackageBuilder
 
         if (fileExtensions.Length < 2)
         {
-            return result.WithValue((file.Name, FlamencoFile: false, BuildTargetSpecificity: 0));
+            return result.WithValue((file.Name, IsFlamencoFile: false,
+                BuildTargetSpecificity: FileNotSpecificToASourcePackageOrSeries));
         }
 
-        bool flamencoFile = false;
+        bool isFlamencoFile;
         bool matchesTarget = true;
         bool packageNameIsDefined = false;
         bool seriesNameIsDefined = false;
@@ -344,8 +350,9 @@ public class DebianSourcePackageBuilder
             }
             else
             {
-                flamencoFile = file.Name.Equals(FlamencoFileName, StringComparison.CurrentCultureIgnoreCase);
-                return result.WithValue((file.Name, flamencoFile, BuildTargetSpecificity: 0));
+                isFlamencoFile = file.Name.Equals(FlamencoFileName, StringComparison.OrdinalIgnoreCase);
+                return result.WithValue((file.Name, isFlamencoFile,
+                    BuildTargetSpecificity: FileNotSpecificToASourcePackageOrSeries));
             }
         }
 
@@ -384,27 +391,22 @@ public class DebianSourcePackageBuilder
 
         string fileName = file.Name.Substring(startIndex: 0, length: file.Name.Length - totalExtensionLength);
 
-        flamencoFile = fileName.Equals(FlamencoFileName, StringComparison.CurrentCultureIgnoreCase);
+        isFlamencoFile = fileName.Equals(FlamencoFileName, StringComparison.CurrentCultureIgnoreCase);
 
-        // A specificity score that determines how specific a file is to a source package or series.
-        // A specificity of -1 means that the file is not specific to current build target.
-        // A specificity of 0 means that the file is not specific to a source package or series.
-        // A specificity of 1 means that the file is specific to either a source package or a series.
-        // A specificity of 2 means that the file is specific to both a source package and a series.
         if (!matchesTarget)
         {
-            buildTargetSpecificity = -1;
+            buildTargetSpecificity = FileNotSpecificToCurrentBuildTarget;
         }
         else if (packageNameIsDefined && seriesNameIsDefined)
         {
-            buildTargetSpecificity = 2;
+            buildTargetSpecificity = FileSpecificToBothSourcePackageAndSeries;
         }
         else
         {
-            buildTargetSpecificity = 1;
+            buildTargetSpecificity = FileSpecificToEitherSourcePackageOrSeries;
         }
 
-        return result.WithValue((fileName, flamencoFile, buildTargetSpecificity));
+        return result.WithValue((fileName, isFlamencoFile, buildTargetSpecificity));
     }
 
     private async Task<Result> CopySourceFilesToDestinationDirectoryAsync(
@@ -497,7 +499,7 @@ public class DebianSourcePackageBuilder
             {
                 if (cancellationToken.IsCancellationRequested) return result.WithAnnotation(new OperationCanceled());
 
-                if (fileInfo.FlamencoFile)
+                if (fileInfo.IsFlamencoFile)
                 {
                     result = result.Merge(await HandleFlamencoFile(fileInfo, destinationDirectory, cancellationToken));
                 }
