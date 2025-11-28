@@ -5,7 +5,8 @@ namespace Flamenco.Packaging.ExternalSources;
 
 public abstract class ExternalSourceBase
 {
-    public abstract Task<Result> Download(string destinationDirectory, CancellationToken cancellationToken = default);
+    public abstract Task<Result> Download(DirectoryInfo destinationDirectory, DirectoryInfo cacheDirectory,
+        CancellationToken cancellationToken = default);
 
     public static Result<ExternalSourceBase> Parse(JsonNode externalSource)
     {

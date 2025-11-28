@@ -526,13 +526,15 @@ public class DebianSourcePackageBuilder
         switch (type)
         {
             case "external_source":
+                var cacheDirectory = Directory.CreateDirectory(Path.Combine(DestinationDirectory.FullName, "cache"));
+
                 var externalSourceResult = ExternalSources.ExternalSourceBase.Parse(jsonNode!);
 
                 if (externalSourceResult.IsFailure)
                     return result.Merge(externalSourceResult);
 
                 var downloadResult =
-                    await externalSourceResult.Value.Download(destinationDirectory.FullName, cancellationToken);
+                    await externalSourceResult.Value.Download(destinationDirectory, cacheDirectory, cancellationToken);
 
                 return result.Merge(downloadResult);
             default:
