@@ -6,7 +6,7 @@ namespace Flamenco.Console;
 public static class Log
 {
     private static void Print(string prefix, string message) => System.Console.WriteLine(string.Concat(prefix, message));
-    
+
     private static void Print(string prefix, string message, ConsoleColor textColor)
     {
         System.Console.ForegroundColor = textColor;
@@ -24,12 +24,12 @@ public static class Log
     {
         Annotations(result.Annotations, 0);
     }
-    
+
     public static void Annotations(ImmutableList<IAnnotation> annotations, int offset)
     {
         const int tabSize = 5;
-        
-        foreach (var annotation in annotations)    
+
+        foreach (var annotation in annotations)
         {
             var message = new StringBuilder();
             message.Append(' ', tabSize * offset).Append(annotation.Severity.ToString()).Append(' ').Append(annotation.Identifier).Append(": ").AppendLine(annotation.Title);
@@ -45,6 +45,12 @@ public static class Log
             {
                 message.AppendLine();
                 message.Append(' ', 2 + tabSize * offset).AppendLine(annotation.Description);
+            }
+
+            foreach (var item in annotation.Metadata)
+            {
+                message.Append(' ', 4 + tabSize * offset).Append(item.Key).Append(": ")
+                    .AppendLine(item.Value?.ToString());
             }
 
             if (annotation is ExceptionalAnnotation exceptionalAnnotation)
@@ -76,6 +82,6 @@ public static class Log
             }
 
             Annotations(annotation.InnerAnnotations, offset + 1);
-        }        
+        }
     }
 }
