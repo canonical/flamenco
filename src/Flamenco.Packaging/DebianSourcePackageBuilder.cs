@@ -526,7 +526,7 @@ public class DebianSourcePackageBuilder
         switch (type)
         {
             case "external_source":
-                var externalSourceResult = ExternalSources.ExternalSourceBase.Create(jsonNode!);
+                var externalSourceResult = ExternalSources.ExternalSourceBase.Parse(jsonNode!);
 
                 if (externalSourceResult.IsFailure)
                     return result.Merge(externalSourceResult);

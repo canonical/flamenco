@@ -7,7 +7,7 @@ public abstract class ExternalSourceBase
 {
     public abstract Task<Result> Download(string destinationDirectory, CancellationToken cancellationToken = default);
 
-    public static Result<ExternalSourceBase> Create(JsonNode externalSource)
+    public static Result<ExternalSourceBase> Parse(JsonNode externalSource)
     {
         var invalidFields = new Dictionary<string, object?>();
         var type = externalSource["sourceType"]?.GetValue<string>();
