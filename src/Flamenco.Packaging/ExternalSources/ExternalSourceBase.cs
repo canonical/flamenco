@@ -36,20 +36,20 @@ public abstract class ExternalSourceBase
     public class UnsupportedExternalSourceType(
         string sourceType)
         : ErrorBase(
-            identifier: "FL0042",
+            identifier: "FL0043",
             title: "Unsupported external source type.",
             message: $"The external source type '{sourceType}' is not supported.");
 
     public class UnspecifiedExternalSourceType()
         : ErrorBase(
-            identifier: "FL0043",
+            identifier: "FL0044",
             title: "Unspecified external source type.",
             message: "The external source type is not specified in the descriptor file.");
 
     public class InvalidGitDescriptorFile(
         Dictionary<string, object?> invalidFields)
         : ErrorBase(
-            identifier: "FL0044",
+            identifier: "FL0045",
             title: "Invalid git external source descriptor.",
             message: "The git external source descriptor file is invalid.",
             metadata: invalidFields.ToImmutableDictionary());

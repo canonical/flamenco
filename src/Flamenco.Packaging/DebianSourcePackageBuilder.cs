@@ -10,6 +10,7 @@
 
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Flamenco.Packaging.Dpkg;
 
@@ -391,7 +392,7 @@ public class DebianSourcePackageBuilder
 
         string fileName = file.Name.Substring(startIndex: 0, length: file.Name.Length - totalExtensionLength);
 
-        isFlamencoFile = fileName.Equals(FlamencoFileName, StringComparison.CurrentCultureIgnoreCase);
+        isFlamencoFile = fileName.Equals(FlamencoFileName, StringComparison.OrdinalIgnoreCase);
 
         if (!matchesTarget)
         {
@@ -519,7 +520,16 @@ public class DebianSourcePackageBuilder
     {
         var result = Result.Success;
 
-        var jsonNode = JsonNode.Parse(await File.ReadAllTextAsync(fileInfo.FileInfo.FullName, cancellationToken));
+        var jsonNode = default(JsonNode);
+
+        try
+        {
+            JsonNode.Parse(await File.ReadAllTextAsync(fileInfo.FileInfo.FullName, cancellationToken));
+        }
+        catch (JsonException ex)
+        {
+            return result.WithAnnotation(new InvalidFlamencoFileContent(fileInfo.FileInfo.FullName, ex));
+        }
 
         var type = jsonNode?["type"]?.GetValue<string>();
 
@@ -759,5 +769,16 @@ public class DebianSourcePackageBuilder
             locations: ImmutableList.Create(new Location { ResourceLocator = filePath }))
     {
     }
-}
 
+    public class InvalidFlamencoFileContent(
+        string filePath,
+        Exception exception)
+        : ErrorBase(
+            identifier: "FL0042",
+            title: "Invalid Flamenco file content",
+            message: $"The Flamenco file '{filePath}' has invalid content",
+            locations: ImmutableList.Create(new Location { ResourceLocator = filePath }),
+            innerAnnotations: ImmutableList.Create<IAnnotation>(new ExceptionalAnnotation(exception)))
+    {
+    }
+}

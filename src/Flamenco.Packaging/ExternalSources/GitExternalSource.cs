@@ -58,7 +58,7 @@ public class GitExternalSource(string repository, string? commitish = null) : Ex
                 var gitDir = Path.Join(repositoryCacheDir.FullName, ".git");
                 if (Directory.Exists(gitDir))
                 {
-                    Directory.Delete(Path.Join(repositoryCacheDir.FullName, ".git"), recursive: true);
+                    Directory.Delete(gitDir, recursive: true);
                 }
             }
         }
@@ -67,15 +67,29 @@ public class GitExternalSource(string repository, string? commitish = null) : Ex
             semaphore.Release();
         }
 
-        await Task.Run(() => CopyDirectory(repositoryCacheDir, destinationDirectory), cancellationToken);
+        try
+        {
+            await Task.Run(() => CopyDirectory(repositoryCacheDir, destinationDirectory, cancellationToken),
+                cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            return result.WithAnnotation(new OperationCanceled());
+        }
+        catch (Exception ex)
+        {
+            return new RepositoryCopyFromCacheFailed(repositoryCacheDir.FullName, destinationDirectory.FullName, ex);
+        }
 
         return result;
     }
 
-    private static void CopyDirectory(DirectoryInfo source, DirectoryInfo destination)
+    private static void CopyDirectory(DirectoryInfo source, DirectoryInfo destination, CancellationToken cancellationToken)
     {
         foreach (var file in source.EnumerateFiles("*", SearchOption.AllDirectories))
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             var relativePath = Path.GetRelativePath(source.FullName, file.FullName);
             var targetPath = Path.Join(destination.FullName, relativePath);
 
@@ -98,4 +112,17 @@ public class GitExternalSource(string repository, string? commitish = null) : Ex
             title: "Git clone failed.",
             message: $"Failed to clone the git repository '{repository}' at '{commitish ?? "default branch"}'",
             innerAnnotations: ImmutableList.Create<IAnnotation>(new ExceptionalAnnotation(exception)));
+
+    public class RepositoryCopyFromCacheFailed(
+        string sourcePath,
+        string destinationPath,
+        Exception exception)
+        : ErrorBase(
+            identifier: "FL0051",
+            title: "Repository copy from cache failed.",
+            message: $"Failed to copy the git repository '{sourcePath}' from cache to '{destinationPath}'.",
+            innerAnnotations: ImmutableList.Create<IAnnotation>(new ExceptionalAnnotation(exception)),
+            locations: ImmutableList.Create(
+                new Location { ResourceLocator = sourcePath },
+                new Location { ResourceLocator = destinationPath }));
 }
