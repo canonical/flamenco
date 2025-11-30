@@ -520,11 +520,11 @@ public class DebianSourcePackageBuilder
     {
         var result = Result.Success;
 
-        var jsonNode = default(JsonNode);
+        JsonNode? jsonNode;
 
         try
         {
-            JsonNode.Parse(await File.ReadAllTextAsync(fileInfo.FileInfo.FullName, cancellationToken));
+            jsonNode = JsonNode.Parse(await File.ReadAllTextAsync(fileInfo.FileInfo.FullName, cancellationToken));
         }
         catch (JsonException ex)
         {
