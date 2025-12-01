@@ -103,11 +103,10 @@ public class GitExternalSource(
         {
             var process = new Process
             {
-                StartInfo = new ProcessStartInfo(
-                    fileName: "/usr/bin/env",
-                    arguments: command.Split(' ',
-                        StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                StartInfo = new ProcessStartInfo
                 {
+                    FileName = "/usr/bin/env",
+                    ArgumentList = { "sh", "-c", command },
                     WorkingDirectory = workingDirectory.FullName,
                     UseShellExecute = false,
                     CreateNoWindow = true
