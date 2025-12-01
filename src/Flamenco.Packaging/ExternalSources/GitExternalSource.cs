@@ -120,8 +120,6 @@ public class GitExternalSource(
             {
                 return result.Merge(new Result().WithAnnotation(new PostCloneCommandFailed(command, process.ExitCode)));
             }
-
-            result.Merge(Result.Success);
         }
 
         return result;
