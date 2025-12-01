@@ -22,10 +22,12 @@ public abstract class ExternalSourceBase
                     invalidFields.Add("repository", "The 'repository' field is required for git external sources.");
                 }
                 var commitish = externalSource["commitish"]?.GetValue<string>();
+                var postCloneCommands = externalSource["postClone"]?.AsArray().GetValues<string>();
 
                 return invalidFields.Any()
                     ? new InvalidGitDescriptorFile(invalidFields)
-                    : new Result<ExternalSourceBase>(Result.Success, new GitExternalSource(repository!, commitish));
+                    : new Result<ExternalSourceBase>(Result.Success,
+                        new GitExternalSource(repository!, commitish, postCloneCommands));
             case null:
                 return new UnspecifiedExternalSourceType();
             default:

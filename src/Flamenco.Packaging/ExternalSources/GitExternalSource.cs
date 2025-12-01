@@ -1,10 +1,14 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using LibGit2Sharp;
 
 namespace Flamenco.Packaging.ExternalSources;
 
-public class GitExternalSource(string repository, string? commitish = null) : ExternalSourceBase
+public class GitExternalSource(
+    string repository,
+    string? commitish = null,
+    IEnumerable<string>? postCloneCommands = null) : ExternalSourceBase
 {
     // We want to clone a repository only once and copy the local clone of the repo to every package x series destination.
     // For that reason, we use a semaphore for each repository to ensure that only one clone operation happens at a time.
@@ -14,6 +18,7 @@ public class GitExternalSource(string repository, string? commitish = null) : Ex
 
     public string Repository { get; } = repository;
     public string? Commitish { get; } = commitish;
+    public IReadOnlyList<string> PostCloneCommands { get; } = (postCloneCommands ?? []).ToList();
 
     public override async Task<Result> Download(DirectoryInfo destinationDirectory, DirectoryInfo cacheDirectory,
         CancellationToken cancellationToken = default)
@@ -55,6 +60,12 @@ public class GitExternalSource(string repository, string? commitish = null) : Ex
                     return new GitCloneFailed(Repository, Commitish, ex);
                 }
 
+                var postCloneResult = await RunPostCloneCommands(repositoryCacheDir, cancellationToken);
+                if (postCloneResult.IsFailure)
+                {
+                    return postCloneResult;
+                }
+
                 var gitDir = Path.Join(repositoryCacheDir.FullName, ".git");
                 if (Directory.Exists(gitDir))
                 {
@@ -79,6 +90,39 @@ public class GitExternalSource(string repository, string? commitish = null) : Ex
         catch (Exception ex)
         {
             return new RepositoryCopyFromCacheFailed(repositoryCacheDir.FullName, destinationDirectory.FullName, ex);
+        }
+
+        return result;
+    }
+
+    private async Task<Result> RunPostCloneCommands(DirectoryInfo workingDirectory, CancellationToken cancellationToken)
+    {
+        var result = new Result();
+
+        foreach (var command in PostCloneCommands)
+        {
+            var process = new Process
+            {
+                StartInfo = new ProcessStartInfo(
+                    fileName: "/usr/bin/env",
+                    arguments: command.Split(' ',
+                        StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                {
+                    WorkingDirectory = workingDirectory.FullName,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                }
+            };
+
+            process.Start();
+            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+
+            if (process.ExitCode != 0)
+            {
+                return result.Merge(new Result().WithAnnotation(new PostCloneCommandFailed(command, process.ExitCode)));
+            }
+
+            result.Merge(Result.Success);
         }
 
         return result;
@@ -125,4 +169,12 @@ public class GitExternalSource(string repository, string? commitish = null) : Ex
             locations: ImmutableList.Create(
                 new Location { ResourceLocator = sourcePath },
                 new Location { ResourceLocator = destinationPath }));
+
+    public class PostCloneCommandFailed(
+    string command,
+    int exitCode)
+    : ErrorBase(
+        identifier: "FL0052",
+        title: "Post-clone command failed.",
+        message: $"The post-clone command '{command}' failed with exit code {exitCode}.");
 }
