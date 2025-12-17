@@ -8,6 +8,7 @@ namespace Flamenco.Packaging.ExternalSources;
 public class GitExternalSource(
     string repository,
     string? commitish = null,
+    string? rootDirectory = null,
     IEnumerable<string>? postCloneCommands = null,
     IEnumerable<string>? ignoredFiles = null) : ExternalSourceBase
 {
@@ -19,6 +20,7 @@ public class GitExternalSource(
 
     public string Repository { get; } = repository;
     public string? Commitish { get; } = commitish;
+    public string? RootDirectory { get; set; } = rootDirectory;
     public IReadOnlyList<string> PostCloneCommands { get; } = (postCloneCommands ?? []).ToList();
     public IReadOnlyList<string> IgnoredFiles { get; } = (ignoredFiles ?? []).ToList();
 
@@ -88,7 +90,20 @@ public class GitExternalSource(
 
         try
         {
-            await Task.Run(() => CopyDirectory(repositoryCacheDir, destinationDirectory, cancellationToken),
+            var sourceDirectory = repositoryCacheDir;
+            if (!string.IsNullOrWhiteSpace(RootDirectory))
+            {
+                var newSourceDirectory = Path.Join(repositoryCacheDir.FullName, RootDirectory);
+
+                if (!Directory.Exists(newSourceDirectory))
+                {
+                    return result.WithAnnotation(new RootDirectoryNotFound(RootDirectory!));
+                }
+
+                sourceDirectory = new DirectoryInfo(newSourceDirectory);
+            }
+
+            await Task.Run(() => CopyDirectory(sourceDirectory, destinationDirectory, cancellationToken),
                 cancellationToken);
         }
         catch (OperationCanceledException)
@@ -211,11 +226,18 @@ public class GitExternalSource(
                 new Location { ResourceLocator = sourcePath },
                 new Location { ResourceLocator = destinationPath }));
 
+    public class RootDirectoryNotFound(
+        string rootDirectory)
+        : ErrorBase(
+            identifier: "FL0052",
+            title: "Root directory not found.",
+            message: $"The specified root directory '{rootDirectory}' was not found in the cloned repository.");
+
     public class PostCloneCommandFailed(
     string command,
     int exitCode)
     : ErrorBase(
-        identifier: "FL0052",
+        identifier: "FL0053",
         title: "Post-clone command failed.",
         message: $"The post-clone command '{command}' failed with exit code {exitCode}.");
 
@@ -223,7 +245,7 @@ public class GitExternalSource(
         string filePath,
         Exception exception)
         : ErrorBase(
-            identifier: "FL0053",
+            identifier: "FL0054",
             title: "Deletion of ignored file failed.",
             message: $"Failed to delete the ignored file '{filePath}'.",
             innerAnnotations: ImmutableList.Create<IAnnotation>(new ExceptionalAnnotation(exception)),
