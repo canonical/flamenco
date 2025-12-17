@@ -140,19 +140,29 @@ public class GitExternalSource(
         foreach (var ignoredFile in IgnoredFiles)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var filePath = Path.Join(workingDirectory.FullName, ignoredFile);
+            var path = Path.Join(workingDirectory.FullName, ignoredFile);
 
-            // If a file does not exist, we don't want to treat it as an error, similar to how '.gitignore' works.
-            if (!File.Exists(filePath)) continue;
+            // If neither a file nor directory exists, we don't want to treat it as an error, similar to how '.gitignore' works.
+            var isFile = File.Exists(path);
+            var isDirectory = Directory.Exists(path);
+
+            if (!isFile && !isDirectory) continue;
 
             try
             {
-                File.Delete(filePath);
+                if (isDirectory)
+                {
+                    Directory.Delete(path, recursive: true);
+                }
+                else
+                {
+                    File.Delete(path);
+                }
             }
             catch (Exception ex)
             {
                 return result.Merge(new Result().WithAnnotation(
-                    new DeletionOfIgnoredFileFailed(filePath, ex)));
+                    new DeletionOfIgnoredFileFailed(path, ex)));
             }
         }
 
