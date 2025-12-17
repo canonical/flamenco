@@ -20,6 +20,7 @@ The Git external source clones a Git repository and optionally checks out a spec
     "sourceType": "git",
     "repository": "https://github.com/canonical/dotnet-test-runner",
     "commitish": "v1.2.0",
+    "rootDirectory": "src/main",
     "postClone": [
         "make GIT_COMMIT_ID",
         "make GIT_TAG_VERSION"
@@ -39,6 +40,7 @@ The Git external source clones a Git repository and optionally checks out a spec
 | `sourceType` | string | **Yes** | The type of external source. Must be `"git"` for Git repositories. |
 | `repository` | string | **Yes** | The URL of the Git repository to clone. Supports HTTPS and SSH URLs. |
 | `commitish` | string | No | A commit SHA, tag, or branch name to check out after cloning. If omitted, the default branch is used. |
+| `rootDirectory` | string | No | A relative path to a subdirectory within the repository to use as the source root. Only this subdirectory will be copied to the destination. |
 | `postClone` | array of strings | No | Shell commands to execute after cloning and checking out. Runs in the cloned repository directory. |
 | `ignoredFiles` | array of strings | No | Relative paths of files or directories to delete from the cloned repository before copying to the build directory. |
 
@@ -78,6 +80,41 @@ If omitted, the repository's default branch (typically `main` or `master`) is us
 "commitish": "v1.2.0"
 "commitish": "7a9f3e2b4c1d"
 "commitish": "main"
+```
+
+##### `rootDirectory` (Optional)
+
+A relative path to a subdirectory within the cloned repository. When specified, only the contents of this subdirectory will be copied to the destination build directory, rather than the entire repository.
+
+This is useful when:
+- The repository contains multiple projects or packages, and you only need one
+- The actual source code is nested within subdirectories
+- You want to exclude top-level configuration or documentation files
+
+The path is relative to the repository root and should use forward slashes (`/`) as path separators, even on Windows.
+
+**Important notes:**
+- The directory must exist in the cloned repository, or an error (FL0052) will be raised
+- The `ignoredFiles` paths are relative to the repository root, not the `rootDirectory`
+- Post-clone commands run in the repository root, before the `rootDirectory` is applied
+
+**Examples:**
+```json
+"rootDirectory": "src"
+"rootDirectory": "packages/core"
+"rootDirectory": "modules/main/source"
+```
+
+**Example use case:**
+```json
+{
+    "repository": "https://github.com/example/monorepo",
+    "rootDirectory": "packages/cli",
+    "ignoredFiles": [
+        "packages/web/",
+        "packages/mobile/"
+    ]
+}
 ```
 
 ##### `postClone` (Optional)
@@ -238,7 +275,27 @@ The following errors can occur during external source processing:
 
 ---
 
-#### FL0052: Post-clone command failed
+#### FL0052: Root directory not found
+
+**Cause**: The directory specified in `rootDirectory` does not exist in the cloned repository.
+
+**Example:**
+```json
+{
+    "repository": "https://github.com/user/repo",
+    "rootDirectory": "src/non-existent"  // Directory doesn't exist
+}
+```
+
+**Resolution**:
+- Verify the path is correct and exists in the repository
+- Check for typos in the directory name (paths are case-sensitive on Linux/macOS)
+- Ensure the directory exists in the specific commit/tag/branch you're checking out
+- Clone the repository manually and verify the directory structure
+
+---
+
+#### FL0053: Post-clone command failed
 
 **Cause**: A command specified in `postClone` exited with a non-zero status code.
 
@@ -256,7 +313,7 @@ The following errors can occur during external source processing:
 
 ---
 
-#### FL0053: Deletion of ignored file failed
+#### FL0054: Deletion of ignored file failed
 
 **Cause**: Failed to delete a file or directory specified in `ignoredFiles`.
 
@@ -340,6 +397,7 @@ Here's a complete example demonstrating all features:
     "sourceType": "git",
     "repository": "https://github.com/canonical/dotnet-test-runner",
     "commitish": "v1.2.0",
+    "rootDirectory": "src",
     "postClone": [
         "make GIT_COMMIT_ID",
         "make GIT_TAG_VERSION",
@@ -363,10 +421,11 @@ Here's a complete example demonstrating all features:
 3. Execute `make GIT_COMMIT_ID` to generate version information
 4. Execute `make GIT_TAG_VERSION` to embed the tag version
 5. Make all shell scripts in `scripts/` executable
-6. Delete Git metadata, CI config, tests, documentation, and editor config
+6. Delete Git metadata, CI config, tests, documentation, and editor config from the repository root
 7. Remove the `.git` directory
-8. Cache the processed result for future use
-9. Copy the final result to the destination directory
+8. Use only the `src` subdirectory as the source (instead of the entire repository)
+9. Cache the processed result for future use
+10. Copy the final result to the destination directory
 
 ## Future Enhancements
 
