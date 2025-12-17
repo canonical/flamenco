@@ -8,7 +8,8 @@ namespace Flamenco.Packaging.ExternalSources;
 public class GitExternalSource(
     string repository,
     string? commitish = null,
-    IEnumerable<string>? postCloneCommands = null) : ExternalSourceBase
+    IEnumerable<string>? postCloneCommands = null,
+    IEnumerable<string>? ignoredFiles = null) : ExternalSourceBase
 {
     // We want to clone a repository only once and copy the local clone of the repo to every package x series destination.
     // For that reason, we use a semaphore for each repository to ensure that only one clone operation happens at a time.
@@ -19,6 +20,7 @@ public class GitExternalSource(
     public string Repository { get; } = repository;
     public string? Commitish { get; } = commitish;
     public IReadOnlyList<string> PostCloneCommands { get; } = (postCloneCommands ?? []).ToList();
+    public IReadOnlyList<string> IgnoredFiles { get; } = (ignoredFiles ?? []).ToList();
 
     public override async Task<Result> Download(DirectoryInfo destinationDirectory, DirectoryInfo cacheDirectory,
         CancellationToken cancellationToken = default)
@@ -64,6 +66,12 @@ public class GitExternalSource(
                 if (postCloneResult.IsFailure)
                 {
                     return postCloneResult;
+                }
+
+                var deletionResult = DeleteIgnoredFiles(repositoryCacheDir, cancellationToken);
+                if (deletionResult.IsFailure)
+                {
+                    return deletionResult;
                 }
 
                 var gitDir = Path.Join(repositoryCacheDir.FullName, ".git");
@@ -125,6 +133,32 @@ public class GitExternalSource(
         return result;
     }
 
+    private Result DeleteIgnoredFiles(DirectoryInfo workingDirectory, CancellationToken cancellationToken)
+    {
+        var result = new Result();
+
+        foreach (var ignoredFile in IgnoredFiles)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var filePath = Path.Join(workingDirectory.FullName, ignoredFile);
+
+            // If a file does not exist, we don't want to treat it as an error, similar to how '.gitignore' works.
+            if (!File.Exists(filePath)) continue;
+
+            try
+            {
+                File.Delete(filePath);
+            }
+            catch (Exception ex)
+            {
+                return result.Merge(new Result().WithAnnotation(
+                    new DeletionOfIgnoredFileFailed(filePath, ex)));
+            }
+        }
+
+        return result;
+    }
+
     private static void CopyDirectory(DirectoryInfo source, DirectoryInfo destination, CancellationToken cancellationToken)
     {
         foreach (var file in source.EnumerateFiles("*", SearchOption.AllDirectories))
@@ -174,4 +208,15 @@ public class GitExternalSource(
         identifier: "FL0052",
         title: "Post-clone command failed.",
         message: $"The post-clone command '{command}' failed with exit code {exitCode}.");
+
+    public class DeletionOfIgnoredFileFailed(
+        string filePath,
+        Exception exception)
+        : ErrorBase(
+            identifier: "FL0053",
+            title: "Deletion of ignored file failed.",
+            message: $"Failed to delete the ignored file '{filePath}'.",
+            innerAnnotations: ImmutableList.Create<IAnnotation>(new ExceptionalAnnotation(exception)),
+            locations: ImmutableList.Create(
+                new Location { ResourceLocator = filePath }));
 }

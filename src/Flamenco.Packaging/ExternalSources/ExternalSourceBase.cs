@@ -23,11 +23,12 @@ public abstract class ExternalSourceBase
                 }
                 var commitish = externalSource["commitish"]?.GetValue<string>();
                 var postCloneCommands = externalSource["postClone"]?.AsArray().GetValues<string>();
+                var ignoredFiles = externalSource["ignoredFiles"]?.AsArray().GetValues<string>();
 
-                return invalidFields.Any()
+                return invalidFields.Count != 0
                     ? new InvalidGitDescriptorFile(invalidFields)
                     : new Result<ExternalSourceBase>(Result.Success,
-                        new GitExternalSource(repository!, commitish, postCloneCommands));
+                        new GitExternalSource(repository!, commitish, postCloneCommands, ignoredFiles));
             case null:
                 return new UnspecifiedExternalSourceType();
             default:
