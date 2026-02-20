@@ -31,8 +31,11 @@ public class GitExternalSource(
 
         if (cancellationToken.IsCancellationRequested) return result.WithAnnotation(new OperationCanceled());
 
+        // We use both the repository URL and the commitish to create a unique cache directory for each specific state
+        // of the repository.
+        var repoCacheDirName = $"{destinationDirectory.Name}@{Commitish ?? "default"}";
         var repositoryCacheDir =
-            new DirectoryInfo(Path.Join(cacheDirectory.FullName, "git", destinationDirectory.Name));
+            new DirectoryInfo(Path.Join(cacheDirectory.FullName, "git", repoCacheDirName));
 
         var semaphore = RepositorySemaphores.GetOrAdd(repositoryCacheDir.FullName,
             _ => new SemaphoreSlim(initialCount: 1, maxCount: 1));
