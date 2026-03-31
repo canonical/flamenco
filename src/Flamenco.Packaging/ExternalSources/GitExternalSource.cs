@@ -127,25 +127,31 @@ public class GitExternalSource(
 
         foreach (var command in PostCloneCommands)
         {
-            var process = new Process
+            using var process = new Process();
+
+            process.StartInfo = new ProcessStartInfo
             {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = "/usr/bin/env",
-                    ArgumentList = { "sh", "-c", command },
-                    WorkingDirectory = workingDirectory.FullName,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                }
+                FileName = "/usr/bin/env",
+                ArgumentList = { "sh", "-c", command },
+                WorkingDirectory = workingDirectory.FullName,
+                UseShellExecute = false,
+                CreateNoWindow = true
             };
 
-            process.Start();
-            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
-
-            if (process.ExitCode != 0)
+            int? exitCode = null;
+            if (process.Start())
             {
-                return result.Merge(new Result().WithAnnotation(new PostCloneCommandFailed(command, process.ExitCode)));
+                await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+
+                if (process.ExitCode == 0)
+                {
+                    continue;
+                }
+
+                exitCode = process.ExitCode;
             }
+
+            return result.Merge(new Result().WithAnnotation(new PostCloneCommandFailed(command, exitCode)));
         }
 
         return result;
@@ -238,11 +244,13 @@ public class GitExternalSource(
 
     public class PostCloneCommandFailed(
     string command,
-    int exitCode)
+    int? exitCode)
     : ErrorBase(
         identifier: "FL0053",
         title: "Post-clone command failed.",
-        message: $"The post-clone command '{command}' failed with exit code {exitCode}.");
+        message: exitCode.HasValue
+            ? $"The post-clone command '{command}' failed with exit code {exitCode}."
+            : $"The post-clone command '{command} could not run.");
 
     public class DeletionOfIgnoredFileFailed(
         string filePath,
