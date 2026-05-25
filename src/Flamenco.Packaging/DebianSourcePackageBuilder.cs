@@ -422,6 +422,7 @@ public class DebianSourcePackageBuilder
         {
             if (!sourceFileIndex.TryGetValue("series", out var seriesFile))
             {
+                if (destinationDirectory.Exists) destinationDirectory.Delete();
                 return result.WithAnnotation(new CouldNotFindPatchesSeriesFile(BuildTarget));
             }
 
@@ -712,10 +713,13 @@ public class DebianSourcePackageBuilder
 
     public class CouldNotFindPatchesSeriesFile(
         BuildTarget buildTarget)
-        : ErrorBase(
+        : AnnotationBase(
             identifier: "FL0038",
             title: "Could not find a patches/series file for build target",
-            message: $"Could not find a patches/series file for build target {buildTarget}",
+            message: $"Could not find a patches/series file for build target {buildTarget}. Building a source " +
+                     $"package that carries no patches.",
+            severity: AnnotationSeverity.Warning,
+            warningLevel: WarningLevels.MajorWarning,
             metadata: ImmutableDictionary<string, object?>.Empty
                 .Add(nameof(BuildTarget), buildTarget))
     {
