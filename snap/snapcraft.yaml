@@ -62,7 +62,6 @@ parts:
       - dpkg-dev
       - fakeroot
       - gcc
-      - tar
       - xz-utils
     override-build: |
       # needed by dpkg-genbuildinfo:
