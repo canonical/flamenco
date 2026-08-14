@@ -62,12 +62,17 @@ parts:
       - dpkg-dev
       - fakeroot
       - gcc
-      - tar
       - xz-utils
     override-build: |
       # needed by dpkg-genbuildinfo:
       cp --recursive /etc/dpkg "$CRAFT_PART_INSTALL"/etc
       cp /var/lib/dpkg/status "$CRAFT_PART_INSTALL"/var/lib/dpkg/
+
+  git-external-source-dependencies:
+    plugin: nil
+    stage-packages:
+      - git
+      - make
 
 layout:
   /etc/dpkg:
