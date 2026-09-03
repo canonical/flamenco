@@ -73,15 +73,20 @@ public class SourceDirectoryInfo
     
     public BuildTargetCollection BuildableTargets { get; }
 
+    /// <summary>
+    /// Returns the path of the changelog file that defines the given build target.
+    /// </summary>
+    public string GetChangelogPath(BuildTarget buildTarget) => Path.Combine(
+        DirectoryInfo.FullName,
+        $"changelog.{buildTarget.PackageName}.{buildTarget.SeriesName}");
+
     public async ValueTask<Result<ChangelogEntry>> ReadFirstChangelogEntryAsync(
         BuildTarget buildTarget,
         CancellationToken cancellationToken)
     {
-        var path = Path.Combine(
-            DirectoryInfo.FullName,
-            $"changelog.{buildTarget.PackageName}.{buildTarget.SeriesName}");
-
-        return await DpkgChangelogReader.ReadFirstChangelogEntryAsync(path, cancellationToken).ConfigureAwait(false);
+        return await DpkgChangelogReader
+            .ReadFirstChangelogEntryAsync(GetChangelogPath(buildTarget), cancellationToken)
+            .ConfigureAwait(false);
     }
     
     public class SourceDirectoryNotFound(

@@ -35,7 +35,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Launchpad", "src\Launchpad\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Flamenco.Shared.UnitTests", "tests\Flamenco.Shared.UnitTests\Flamenco.Shared.UnitTests.csproj", "{03800ADF-CE8C-4B4A-95CD-0DC89306CE31}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Flamenco.Distro.ReleaseInfo.UnitTests", "tests\Flamenco.Distro.ReleaseInfo.UnitTests\Flamenco.Distro.ReleaseInfo.UnitTests.csproj", "{9F873172-1E86-4CE7-B96D-E96D381367B4}"
+	Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Flamenco.Distro.ReleaseInfo.UnitTests", "tests\Flamenco.Distro.ReleaseInfo.UnitTests\Flamenco.Distro.ReleaseInfo.UnitTests.csproj", "{9F873172-1E86-4CE7-B96D-E96D381367B4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Flamenco.Console.UnitTests", "tests\Flamenco.Console.UnitTests\Flamenco.Console.UnitTests.csproj", "{92A7C9B8-3529-4F32-9135-E5D8C4E0A9B7}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -98,6 +100,10 @@ Global
 		{9F873172-1E86-4CE7-B96D-E96D381367B4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9F873172-1E86-4CE7-B96D-E96D381367B4}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9F873172-1E86-4CE7-B96D-E96D381367B4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{92A7C9B8-3529-4F32-9135-E5D8C4E0A9B7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{92A7C9B8-3529-4F32-9135-E5D8C4E0A9B7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{92A7C9B8-3529-4F32-9135-E5D8C4E0A9B7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{92A7C9B8-3529-4F32-9135-E5D8C4E0A9B7}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{35732E85-AF6A-4E5B-823D-A617B09D55DB} = {16811994-FB1A-4F7A-96EF-D678EB179DE5}
@@ -113,5 +119,6 @@ Global
 		{B88472F8-3679-41BC-833D-2F61E5E21F78} = {16811994-FB1A-4F7A-96EF-D678EB179DE5}
 		{03800ADF-CE8C-4B4A-95CD-0DC89306CE31} = {EAC0E12D-8473-41B4-9286-76ACAE2F5B12}
 		{9F873172-1E86-4CE7-B96D-E96D381367B4} = {EAC0E12D-8473-41B4-9286-76ACAE2F5B12}
+		{92A7C9B8-3529-4F32-9135-E5D8C4E0A9B7} = {EAC0E12D-8473-41B4-9286-76ACAE2F5B12}
 	EndGlobalSection
 EndGlobal
