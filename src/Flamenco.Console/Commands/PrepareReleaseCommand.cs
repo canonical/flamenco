@@ -11,7 +11,7 @@ using Flamenco.Packaging.Dpkg;
 
 namespace Flamenco.Console.Commands;
 
-public class PrepareReleaseCommand : Command
+public partial class PrepareReleaseCommand : Command
 {
     /// <summary>The cve.json component that provides the .NET SDK half of the upstream version.</summary>
     private const string SdkComponentName = "dotnet-sdk";
@@ -33,23 +33,15 @@ public class PrepareReleaseCommand : Command
     private const int ColumnLimit = 80;
 
     /// <summary>
-    /// The line length that description lines are wrapped to. One column below
-    /// <see cref="ColumnLimit"/>, so that the generated lines stay within the limit with a margin.
-    /// </summary>
-    private const int DescriptionWidth = ColumnLimit - 1;
-
-    /// <summary>
     /// Matches the trailing counter of every revision segment, so that <c>0ubuntu3~24.04.2~ppa2</c>
     /// becomes <c>0ubuntu1~24.04.1~ppa1</c>. A new upstream release resets all of them.
     /// </summary>
-    private static readonly Regex RevisionCounterPattern = new(
-        pattern: @"\d+(?=$|~)",
-        options: RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    [GeneratedRegex(@"\d+(?=$|~)", RegexOptions.CultureInvariant)]
+    private static partial Regex RevisionCounterPattern();
 
     /// <summary>Matches the <c>Name &lt;email&gt;</c> form that DEBEMAIL may carry, as supported by dch(1).</summary>
-    private static readonly Regex NameAndEmailPattern = new(
-        pattern: @"^\s*(?<name>[^<]*?)\s*<(?<email>[^>]+)>\s*$",
-        options: RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    [GeneratedRegex(@"^\s*(?<name>[^<]*?)\s*<(?<email>[^>]+)>\s*$", RegexOptions.CultureInvariant)]
+    private static partial Regex NameAndEmailPattern();
 
     private static readonly char[] UnrepresentableMaintainerCharacters = ['<', '>', '\n', '\r'];
 
@@ -147,7 +139,7 @@ public class PrepareReleaseCommand : Command
         foreach (var buildTarget in buildTargets)
         {
             // The .NET major version is the trailing number of the package name: dotnet8 -> "8.0".
-            string majorVersion = new string(buildTarget.PackageName.SkipWhile(c => !char.IsAsciiDigit(c)).ToArray());
+            string majorVersion = new([.. buildTarget.PackageName.SkipWhile(c => !char.IsAsciiDigit(c))]);
             if (majorVersion.Length == 0 || !majorVersion.All(char.IsAsciiDigit))
             {
                 Skip(buildTarget, $"the package name '{buildTarget.PackageName}' does not end in a .NET major version");
@@ -317,7 +309,7 @@ public class PrepareReleaseCommand : Command
             if (previousEntry.Version.Revision is not null)
             {
                 versionBuilder.Append('-').Append(
-                    RevisionCounterPattern.Replace(previousEntry.Version.Revision, replacement: "1"));
+                    RevisionCounterPattern().Replace(previousEntry.Version.Revision, replacement: "1"));
             }
 
             var parseVersionResult = DpkgVersion.Parse(
@@ -355,7 +347,6 @@ public class PrepareReleaseCommand : Command
                 Date: date);
 
             string changelogText = entry.ToChangelogString();
-            WarnIfDescriptionExceedsColumnLimit(buildTarget, entry.Description);
             Log.Info($"[ADD] {buildTarget}: {previousEntry.Version} -> {version} " +
                      $"({disclosures.Length} CVE(s))");
 
@@ -435,7 +426,7 @@ public class PrepareReleaseCommand : Command
     }
 
     /// <summary>
-    /// Greedily wraps <paramref name="text"/> to <see cref="DescriptionWidth"/> characters.
+    /// Greedily wraps <paramref name="text"/> to <see cref="ColumnLimit"/> - 1 characters.
     /// </summary>
     /// <remarks>
     /// Words that are longer than the available width overflow the line rather than being broken,
@@ -451,7 +442,7 @@ public class PrepareReleaseCommand : Command
         {
             if (line.Length > prefixLength)
             {
-                if (line.Length + 1 + word.Length > DescriptionWidth)
+                if (line.Length + 1 + word.Length > ColumnLimit - 1)
                 {
                     lines.Add(line.ToString());
                     line.Clear().Append(prefix);
@@ -469,25 +460,6 @@ public class PrepareReleaseCommand : Command
         if (line.Length > prefixLength) lines.Add(line.ToString());
 
         return lines;
-    }
-
-    /// <summary>
-    /// Warns about description lines that exceed <see cref="ColumnLimit"/> columns.
-    /// </summary>
-    /// <remarks>
-    /// <see cref="Wrap"/> keeps every line within the limit, unless a single word is too long to
-    /// fit, which cannot be resolved by wrapping and needs to be reworded by hand.
-    /// </remarks>
-    internal static void WarnIfDescriptionExceedsColumnLimit(BuildTarget buildTarget, string description)
-    {
-        foreach (var line in description.Split('\n'))
-        {
-            if (line.Length <= ColumnLimit) continue;
-
-            Log.Warning($"{buildTarget}: a changelog line is {line.Length} columns long, which exceeds the " +
-                        $"recommended maximum of {ColumnLimit} columns, because it contains a word that does " +
-                        $"not fit. Please reword it by hand: '{line.Trim()}'");
-        }
     }
 
     internal static bool AffectsLinux(Disclosure disclosure) =>
@@ -573,6 +545,20 @@ public class PrepareReleaseCommand : Command
         return false;
     }
 
+    /// <summary>
+    /// Derives the next patch version from the previous changelog entry by incrementing the patch
+    /// component by one.
+    /// </summary>
+    internal static bool TryReplacePatch(string version, out int previousPatch, out string result)
+    {
+        previousPatch = default;
+        result = string.Empty;
+
+        if (!TryGetPatch(version, out previousPatch)) return false;
+
+        return TryReplacePatch(version, previousPatch + 1, out result);
+    }
+
     private static bool TryGetLeadingDigits(string segment, out int value)
     {
         int length = 0;
@@ -584,24 +570,6 @@ public class PrepareReleaseCommand : Command
 
         value = default;
         return false;
-    }
-
-    /// <summary>
-    /// Derives the next patch version from the previous changelog entry by incrementing the patch
-    /// component by one.
-    /// </summary>
-    /// <remarks>
-    /// .NET servicing releases increment both the SDK and runtime patch versions by exactly one
-    /// every month, so this is reliable when Microsoft omits a component from cve.json.
-    /// </remarks>
-    internal static bool TryReplacePatch(string version, out int previousPatch, out string result)
-    {
-        previousPatch = default;
-        result = string.Empty;
-
-        if (!TryGetPatch(version, out previousPatch)) return false;
-
-        return TryReplacePatch(version, previousPatch + 1, out result);
     }
 
     /// <summary>
@@ -673,7 +641,7 @@ public class PrepareReleaseCommand : Command
 
         if (email is not null)
         {
-            var match = NameAndEmailPattern.Match(email);
+            var match = NameAndEmailPattern().Match(email);
             if (match.Success)
             {
                 email = match.Groups["email"].Value;

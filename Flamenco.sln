@@ -35,7 +35,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Launchpad", "src\Launchpad\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Flamenco.Shared.UnitTests", "tests\Flamenco.Shared.UnitTests\Flamenco.Shared.UnitTests.csproj", "{03800ADF-CE8C-4B4A-95CD-0DC89306CE31}"
 EndProject
-	Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Flamenco.Distro.ReleaseInfo.UnitTests", "tests\Flamenco.Distro.ReleaseInfo.UnitTests\Flamenco.Distro.ReleaseInfo.UnitTests.csproj", "{9F873172-1E86-4CE7-B96D-E96D381367B4}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Flamenco.Distro.ReleaseInfo.UnitTests", "tests\Flamenco.Distro.ReleaseInfo.UnitTests\Flamenco.Distro.ReleaseInfo.UnitTests.csproj", "{9F873172-1E86-4CE7-B96D-E96D381367B4}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Flamenco.Console.UnitTests", "tests\Flamenco.Console.UnitTests\Flamenco.Console.UnitTests.csproj", "{92A7C9B8-3529-4F32-9135-E5D8C4E0A9B7}"
 EndProject

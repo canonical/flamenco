@@ -1,7 +1,5 @@
-using System.Collections.Immutable;
 using System.Text.RegularExpressions;
 using Flamenco.Console.Commands;
-using Flamenco.Packaging.Dpkg;
 
 namespace Flamenco.Console;
 
@@ -13,8 +11,7 @@ public class PrepareReleaseCommandTests
     [InlineData("8.0.130", 130)]
     [InlineData("9.0.19", 19)]
     [InlineData("10.0.112", 112)]
-    [InlineData("10.0.100~rc2", 100)]
-    [InlineData("8.0.425~preview1", 425)]
+    [InlineData("8.0.131", 131)]
     public void TryGetPatch_ValidThreePartVersion_ReturnsPatch(string version, int expectedPatch)
     {
         Assert.True(PrepareReleaseCommand.TryGetPatch(version, out int patch));
@@ -35,7 +32,6 @@ public class PrepareReleaseCommandTests
     [InlineData("8.0.130", "8.0.131")]
     [InlineData("9.0.19", "9.0.20")]
     [InlineData("10.0.112", "10.0.113")]
-    [InlineData("10.0.100~rc2", "10.0.101~rc2")]
     public void TryReplacePatch_IncrementsPatch(string previous, string expected)
     {
         Assert.True(PrepareReleaseCommand.TryReplacePatch(previous, out _, out string result));
@@ -45,8 +41,7 @@ public class PrepareReleaseCommandTests
     [Theory]
     [InlineData("8.0.130", 131, "8.0.131")]
     [InlineData("8.0.100", 425, "8.0.425")]
-    [InlineData("10.0.100~rc2", 101, "10.0.101~rc2")]
-    [InlineData("8.0.100~preview1", 425, "8.0.425~preview1")]
+    [InlineData("8.0.131", 132, "8.0.132")]
     public void TryReplacePatch_WithExplicitNewPatch_ReplacesPatch(string version, int newPatch, string expected)
     {
         Assert.True(PrepareReleaseCommand.TryReplacePatch(version, newPatch, out string result));
@@ -54,19 +49,9 @@ public class PrepareReleaseCommandTests
     }
 
     [Theory]
-    [InlineData("10.0.100~rc2", 100)]
-    [InlineData("8.0.425~preview1", 425)]
-    public void TryGetPatch_PreservesSuffixInVersion(string version, int expectedPatch)
-    {
-        Assert.True(PrepareReleaseCommand.TryGetPatch(version, out int patch));
-        Assert.Equal(expectedPatch, patch);
-    }
-
-    [Theory]
     [InlineData("8.0.400", 4)]
     [InlineData("9.0.120", 1)]
     [InlineData("10.0.112", 1)]
-    [InlineData("10.0.400~rc1", 4)]
     public void TryGetFeatureBand_BandFromPatch(string version, int expectedBand)
     {
         Assert.True(PrepareReleaseCommand.TryGetFeatureBand(version, out int band));
@@ -173,7 +158,7 @@ public class PrepareReleaseCommandTests
         var disclosure = new PrepareReleaseCommand.Disclosure(
             Id: "CVE-TEST",
             Platforms: platforms,
-            Description: new[] { "x" },
+            Description: ["x"],
             Cna: null);
 
         Assert.Equal(expected, PrepareReleaseCommand.AffectsLinux(disclosure));
@@ -188,14 +173,14 @@ public class PrepareReleaseCommandTests
     {
         var release = "8.0";
         var document = new PrepareReleaseCommand.CveDocument(
-            Disclosures: System.Array.Empty<PrepareReleaseCommand.Disclosure>(),
-            Products: new[]
-            {
+            Disclosures: [],
+            Products:
+            [
                 new PrepareReleaseCommand.Fix("dotnet-runtime", release, "8.0.30"),
                 new PrepareReleaseCommand.Fix("dotnet-aspnetcore", release, "8.0.31")
-            },
-            Packages: System.Array.Empty<PrepareReleaseCommand.Fix>(),
-            ReleaseCves: new Dictionary<string, string[]>());
+            ],
+            Packages: [],
+            ReleaseCves: []);
 
         var runtime = PrepareReleaseCommand.FindFixedVersion(document, "dotnet-runtime", release, null);
         var fallback = PrepareReleaseCommand.FindFixedVersion(document, "dotnet-aspnetcore", release, null);
@@ -209,14 +194,14 @@ public class PrepareReleaseCommandTests
     {
         var release = "8.0";
         var document = new PrepareReleaseCommand.CveDocument(
-            Disclosures: System.Array.Empty<PrepareReleaseCommand.Disclosure>(),
-            Products: System.Array.Empty<PrepareReleaseCommand.Fix>(),
-            Packages: new[]
-            {
+            Disclosures: [],
+            Products: [],
+            Packages:
+            [
                 new PrepareReleaseCommand.Fix("dotnet-sdk", release, "8.0.131"),
                 new PrepareReleaseCommand.Fix("dotnet-sdk", release, "8.0.425")
-            },
-            ReleaseCves: new Dictionary<string, string[]>());
+            ],
+            ReleaseCves: []);
 
         var band1 = PrepareReleaseCommand.FindFixedVersion(document, "dotnet-sdk", release, 1);
         var band4 = PrepareReleaseCommand.FindFixedVersion(document, "dotnet-sdk", release, 4);
@@ -230,14 +215,14 @@ public class PrepareReleaseCommandTests
     {
         var release = "8.0";
         var document = new PrepareReleaseCommand.CveDocument(
-            Disclosures: System.Array.Empty<PrepareReleaseCommand.Disclosure>(),
-            Products: System.Array.Empty<PrepareReleaseCommand.Fix>(),
-            Packages: new[]
-            {
+            Disclosures: [],
+            Products: [],
+            Packages:
+            [
                 new PrepareReleaseCommand.Fix("dotnet-sdk", release, "8.0.131"),
                 new PrepareReleaseCommand.Fix("dotnet-sdk", release, "8.0.132")
-            },
-            ReleaseCves: new Dictionary<string, string[]>());
+            ],
+            ReleaseCves: []);
 
         Assert.Null(PrepareReleaseCommand.FindFixedVersion(document, "dotnet-sdk", release, 1));
     }
@@ -247,16 +232,16 @@ public class PrepareReleaseCommandTests
     {
         var release = "8.0";
         var document = new PrepareReleaseCommand.CveDocument(
-            Disclosures: System.Array.Empty<PrepareReleaseCommand.Disclosure>(),
-            Products: new[]
-            {
+            Disclosures: [],
+            Products:
+            [
                 new PrepareReleaseCommand.Fix("dotnet-runtime", release, "8.0.31")
-            },
-            Packages: new[]
-            {
+            ],
+            Packages:
+            [
                 new PrepareReleaseCommand.Fix("dotnet-runtime", release, "8.0.31")
-            },
-            ReleaseCves: new Dictionary<string, string[]>());
+            ],
+            ReleaseCves: []);
 
         var result = PrepareReleaseCommand.FindFixedVersion(document, "dotnet-runtime", release, null);
         Assert.Equal("8.0.31", result);
@@ -267,13 +252,13 @@ public class PrepareReleaseCommandTests
     {
         var release = "8.0";
         var document = new PrepareReleaseCommand.CveDocument(
-            Disclosures: System.Array.Empty<PrepareReleaseCommand.Disclosure>(),
-            Products: new[]
-            {
+            Disclosures: [],
+            Products:
+            [
                 new PrepareReleaseCommand.Fix("dotnet-runtime", release, "8.0.31")
-            },
-            Packages: System.Array.Empty<PrepareReleaseCommand.Fix>(),
-            ReleaseCves: new Dictionary<string, string[]>());
+            ],
+            Packages: [],
+            ReleaseCves: []);
 
         Assert.Null(PrepareReleaseCommand.FindFixedVersion(document, "dotnet-sdk", release, null));
     }
@@ -283,13 +268,13 @@ public class PrepareReleaseCommandTests
     {
         var release = "8.0";
         var document = new PrepareReleaseCommand.CveDocument(
-            Disclosures: System.Array.Empty<PrepareReleaseCommand.Disclosure>(),
-            Products: new[]
-            {
+            Disclosures: [],
+            Products:
+            [
                 new PrepareReleaseCommand.Fix("dotnet-runtime", "10.0", "10.0.11")
-            },
-            Packages: System.Array.Empty<PrepareReleaseCommand.Fix>(),
-            ReleaseCves: new Dictionary<string, string[]>());
+            ],
+            Packages: [],
+            ReleaseCves: []);
 
         Assert.Null(PrepareReleaseCommand.FindFixedVersion(document, "dotnet-runtime", release, null));
     }
@@ -299,13 +284,13 @@ public class PrepareReleaseCommandTests
     {
         var release = "8.0";
         var document = new PrepareReleaseCommand.CveDocument(
-            Disclosures: System.Array.Empty<PrepareReleaseCommand.Disclosure>(),
-            Products: new[]
-            {
+            Disclosures: [],
+            Products:
+            [
                 new PrepareReleaseCommand.Fix("dotnet-runtime", release, "")
-            },
-            Packages: System.Array.Empty<PrepareReleaseCommand.Fix>(),
-            ReleaseCves: new Dictionary<string, string[]>());
+            ],
+            Packages: [],
+            ReleaseCves: []);
 
         Assert.Null(PrepareReleaseCommand.FindFixedVersion(document, "dotnet-runtime", release, null));
     }

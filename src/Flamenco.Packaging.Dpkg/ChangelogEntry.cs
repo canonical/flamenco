@@ -50,8 +50,7 @@ public readonly record struct ChangelogEntry(
     /// </remarks>
     public string ToChangelogString()
     {
-        // ponytail: Metadata is unordered, so multiple keys serialize in arbitrary order. Wrap in
-        // OrderBy(key) if an entry ever carries more than the usual single 'urgency' key.
+        
         var metadata = string.Join(separator: ", ", Metadata.Select(entry => $"{entry.Key}={entry.Value}"));
         var distributions = string.Join(separator: ' ', Distributions);
         var date = Date.ToString(DateFormat, CultureInfo.InvariantCulture);

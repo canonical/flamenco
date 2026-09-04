@@ -19,7 +19,7 @@ public class DpkgChangelogReaderTests
 
         using var changelogReader = new DpkgChangelogReader(new StringReader(changelog));
 
-        var readEntryResult = await changelogReader.ReadChangelogEntryAsync().ConfigureAwait(false);
+        var readEntryResult = await changelogReader.ReadChangelogEntryAsync();
         Assert.True(readEntryResult.IsSuccess);
         Assert.True(readEntryResult.HasValue);
         Assert.True(readEntryResult.Value.HasValue);
@@ -54,7 +54,7 @@ public class DpkgChangelogReaderTests
                 offset: new TimeSpan(hours: 3, minutes: 0, seconds: 0)), 
             actual: entry.Date);
         
-        readEntryResult = await changelogReader.ReadChangelogEntryAsync().ConfigureAwait(false);
+        readEntryResult = await changelogReader.ReadChangelogEntryAsync();
         Assert.True(readEntryResult.IsSuccess);
         Assert.Null(readEntryResult.Value);
     }
@@ -97,7 +97,7 @@ public class DpkgChangelogReaderTests
         var entry = new ChangelogEntry(
             PackageName: DpkgName.Parse("dotnet8"),
             Version: DpkgVersion.Parse("8.0.131-8.0.31-0ubuntu1", formatProvider: null),
-            Distributions: ImmutableArray.Create(DpkgSuite.Parse("noble")),
+            Distributions: [DpkgSuite.Parse("noble")],
             Metadata: ImmutableDictionary<string, string>.Empty.Add("urgency", "medium"),
             Description: "\n  * Test.\n\n",
             Maintainer: new MaintainerInfo("Test", "test@example.com"),
