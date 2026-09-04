@@ -8,6 +8,7 @@ using System.Text.RegularExpressions;
 using Flamenco.Distro.ReleaseInfo;
 using Flamenco.Packaging;
 using Flamenco.Packaging.Dpkg;
+using Spectre.Console;
 
 namespace Flamenco.Console.Commands;
 
@@ -129,10 +130,11 @@ public partial class PrepareReleaseCommand : Command
         int prepared = 0;
         int skipped = 0;
         int failed = 0;
+        string? currentMajor = null;
 
         void Skip(BuildTarget target, string reason)
         {
-            Log.Info($"[SKIP] {target}: {reason}");
+            AnsiConsole.MarkupLine($"[yellow][[SKIP]][/] {target}: {Markup.Escape(reason)}");
             ++skipped;
         }
 
@@ -147,6 +149,17 @@ public partial class PrepareReleaseCommand : Command
             }
 
             string release = $"{majorVersion}.0";
+
+            if (majorVersion != currentMajor)
+            {
+                currentMajor = majorVersion;
+                AnsiConsole.WriteLine();
+                AnsiConsole.Write(new Rule($"[bold].NET {release}[/]")
+                {
+                    Style = Style.Parse("blue"),
+                    Justification = Justify.Left,
+                });
+            }
 
             var ubuntuRelease = UbuntuReleases.All
                 .FirstOrDefault(candidate => candidate.Series.Identifier == buildTarget.SeriesName);
@@ -297,7 +310,9 @@ public partial class PrepareReleaseCommand : Command
             }
             else
             {
-                Log.Info($"{buildTarget}: using SDK version '{sdkVersion}' and runtime version '{runtimeVersion}' from cve.json.");
+                AnsiConsole.MarkupLine(
+                    $"[dim][[INFO]][/] {buildTarget.PackageName}:[bold]{buildTarget.SeriesName}[/]: " +
+                    $"using SDK version '{sdkVersion}' and runtime version '{runtimeVersion}' from cve.json.");
             }
 
             var versionBuilder = new StringBuilder();
@@ -347,8 +362,9 @@ public partial class PrepareReleaseCommand : Command
                 Date: date);
 
             string changelogText = entry.ToChangelogString();
-            Log.Info($"[ADD] {buildTarget}: {previousEntry.Version} -> {version} " +
-                     $"({disclosures.Length} CVE(s))");
+            AnsiConsole.MarkupLine(
+                $"[green][[ADD]][/] {buildTarget}: {previousEntry.Version} -> {version} " +
+                $"({disclosures.Length} CVE(s))");
 
             if (apply)
             {
@@ -367,8 +383,11 @@ public partial class PrepareReleaseCommand : Command
             ++prepared;
         }
 
-        Log.Info($"Total Targets: {buildTargets.Length}; Prepared: {prepared}; " +
-                 $"Skipped: {skipped}; Failed: {failed}");
+        AnsiConsole.MarkupLine(
+            $"[[INFO]] Total Targets: {buildTargets.Length}; " +
+            $"[green]Prepared: {prepared}[/]; " +
+            $"[yellow]Skipped: {skipped}[/]; " +
+            $"[red]Failed: {failed}[/]");
 
         if (failed > 0)
         {
@@ -382,7 +401,9 @@ public partial class PrepareReleaseCommand : Command
         }
         else if (!apply)
         {
-            Log.Info($"This was a dry run. Re-run with '{ApplyOption.Name}' to write these entries.");
+            AnsiConsole.MarkupLine(
+                $"[dim]This was a dry run. Re-run with[/] [bold]'{ApplyOption.Name}'[/] " +
+                $"[dim]to write these entries.[/]");
         }
 
         return 0;
