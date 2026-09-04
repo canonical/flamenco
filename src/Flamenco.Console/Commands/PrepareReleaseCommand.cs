@@ -233,15 +233,6 @@ public partial class PrepareReleaseCommand : Command
                 continue;
             }
 
-            // The upstream version is a compound of the SDK and the runtime version,
-            // for example "8.0.131-8.0.31". The previous distinct release (skipping binary-only
-            // rebuilds) provides the historical SDK-to-runtime offset used to derive a missing half.
-            int sdkRuntimeOffset = previousReleaseUpstream.Length == 2 &&
-                                 TryGetPatch(previousReleaseUpstream[0], out int sdkPatch) &&
-                                 TryGetPatch(previousReleaseUpstream[1], out int runtimePatch)
-                ? sdkPatch - runtimePatch
-                : 0;
-
             string? sdkVersion = FindFixedVersion(cveDocument, SdkComponentName, release, featureBand);
             string? runtimeVersion = FindFixedVersion(cveDocument, PrimaryRuntimeComponentName, release, featureBand: null);
             if (runtimeVersion is null)
@@ -249,62 +240,24 @@ public partial class PrepareReleaseCommand : Command
                 runtimeVersion = FindFixedVersion(cveDocument, FallbackRuntimeComponentName, release, featureBand: null);
             }
 
-            if (sdkVersion is null && runtimeVersion is null)
+            if (sdkVersion is null || runtimeVersion is null)
             {
-                // Microsoft may omit both dotnet-sdk and the runtime component from some monthly
-                // cve.json files. Derive both halves from the previous release by incrementing each
-                // patch by one.
-                if (TryReplacePatch(previousReleaseUpstream[0], out _, out sdkVersion) &&
+                // Microsoft may omit a component from some monthly cve.json files. Derive both
+                // halves from the previous release by incrementing each patch by one.
+                if (previousReleaseUpstream.Length == 2 &&
+                    TryReplacePatch(previousReleaseUpstream[0], out _, out sdkVersion) &&
                     TryReplacePatch(previousReleaseUpstream[1], out _, out runtimeVersion))
                 {
-                    Log.Info($"{buildTarget}: cve.json has no {SdkComponentName} or {PrimaryRuntimeComponentName} fix; " +
-                             $"derived SDK '{sdkVersion}' and runtime '{runtimeVersion}' from the previous release " +
-                             $"'{previousReleaseResult?.Version.UpstreamVersion ?? previousEntry.Version.UpstreamVersion}'.");
+                    AnsiConsole.MarkupLine(
+                        $"[dim][[INFO]][/] {buildTarget.PackageName}:[bold]{buildTarget.SeriesName}[/]: " +
+                        $"cve.json has no {SdkComponentName} or runtime fix; " +
+                        $"derived SDK '{sdkVersion}' and runtime '{runtimeVersion}' from the previous release.");
                 }
 
                 if (sdkVersion is null || runtimeVersion is null)
                 {
                     Skip(buildTarget, $"cve.json has no unambiguous {SdkComponentName} or runtime fix for .NET {release}, " +
                                       "and the versions cannot be derived from the previous changelog entry");
-                    continue;
-                }
-            }
-            else if (sdkVersion is null && runtimeVersion is not null)
-            {
-                // Only the runtime is present. Derive the SDK version by applying the historical
-                // SDK-to-runtime offset to the runtime version from cve.json.
-                if (TryGetPatch(runtimeVersion, out int runtimePatchFromCve) &&
-                    TryReplacePatch(runtimeVersion, runtimePatchFromCve + sdkRuntimeOffset, out sdkVersion))
-                {
-                    Log.Info($"{buildTarget}: cve.json has no {SdkComponentName} fix; derived SDK version " +
-                             $"'{sdkVersion}' from runtime '{runtimeVersion}' using offset {sdkRuntimeOffset}.");
-                }
-
-                if (sdkVersion is null)
-                {
-                    Skip(buildTarget, $"cve.json has no unambiguous {SdkComponentName} fix for .NET {release} " +
-                                      $"feature band {featureBand}xx, and the SDK version cannot be derived " +
-                                      "from the previous changelog entry");
-                    continue;
-                }
-            }
-            else if (runtimeVersion is null && sdkVersion is not null)
-            {
-                // Only the SDK is present. Derive the runtime version by applying the historical
-                // SDK-to-runtime offset to the SDK version from cve.json.
-                if (TryGetPatch(sdkVersion, out int sdkPatchFromCve) &&
-                    TryReplacePatch(sdkVersion, sdkPatchFromCve - sdkRuntimeOffset, out runtimeVersion))
-                {
-                    Log.Info($"{buildTarget}: cve.json has no {PrimaryRuntimeComponentName} or " +
-                             $"{FallbackRuntimeComponentName} fix; derived runtime version " +
-                             $"'{runtimeVersion}' from SDK '{sdkVersion}' using offset {sdkRuntimeOffset}.");
-                }
-
-                if (runtimeVersion is null)
-                {
-                    Skip(buildTarget, $"cve.json has no {PrimaryRuntimeComponentName} or " +
-                                      $"{FallbackRuntimeComponentName} fix for .NET {release}, " +
-                                      "and the runtime version cannot be derived from the previous changelog entry");
                     continue;
                 }
             }
