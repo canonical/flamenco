@@ -1,5 +1,7 @@
 using System.Text.RegularExpressions;
 using Flamenco.Console.Commands;
+using Flamenco.Distro.ReleaseInfo;
+using Flamenco.Packaging.Dpkg;
 
 namespace Flamenco.Console;
 
@@ -305,6 +307,47 @@ public class PrepareReleaseCommandTests
             ReleaseCves: null);
 
         Assert.Null(PrepareReleaseCommand.FindFixedVersion(document, "dotnet-runtime", "8.0", null));
+    }
+
+    #endregion
+
+    #region Target distribution
+
+    [Theory]
+    // Stable series in the primary archive move to the security pocket.
+    [InlineData("resolute", "10.0.113-10.0.13-0ubuntu1~26.04.1", false, "resolute-security")]
+    [InlineData("resolute-security", "10.0.113-10.0.13-0ubuntu1~26.04.1", false, "resolute-security")]
+    [InlineData("noble", "8.0.132-8.0.32-0ubuntu1~24.04.1", false, "noble-security")]
+    [InlineData("jammy-updates", "8.0.132-8.0.32-0ubuntu1~22.04.1", false, "jammy-security")]
+    // The development series has no security pocket yet.
+    [InlineData("stonking", "10.0.113-10.0.13-0ubuntu1", true, "stonking")]
+    // PPAs have no pockets.
+    [InlineData("jammy", "10.0.113-10.0.13-0ubuntu1~22.04.1~ppa1", false, "jammy")]
+    [InlineData("noble", "9.0.122-9.0.21-0ubuntu1~24.04.1~ppa1", false, "noble")]
+    public void DeriveDistributions_SelectsPocketForTargetArchive(
+        string previousDistribution, string version, bool isDevelopmentSeries, string expected)
+    {
+        var result = PrepareReleaseCommand.DeriveDistributions(
+            [DpkgSuite.Parse(previousDistribution)],
+            DpkgVersion.Parse(version, formatProvider: null),
+            isDevelopmentSeries);
+
+        Assert.Equal([expected], result.Select(suite => suite.ToString()));
+    }
+
+    [Theory]
+    // Ubuntu 24.04 (noble) was released on 2024-04-25.
+    [InlineData("2024-01-15", true)]
+    [InlineData("2024-04-24", true)]
+    [InlineData("2024-04-25", false)]
+    [InlineData("2026-10-07", false)]
+    public void IsDevelopmentSeries_DependsOnReleaseDate(string today, bool expected)
+    {
+        var noble = UbuntuReleases.FromSeries(DpkgSeries.Parse("noble"));
+        Assert.NotNull(noble);
+        Assert.Equal(new DateOnly(2024, 4, 25), noble!.Released);
+
+        Assert.Equal(expected, PrepareReleaseCommand.IsDevelopmentSeries(noble, DateOnly.Parse(today)));
     }
 
     #endregion
