@@ -19,4 +19,8 @@
     <ProjectReference Include="..\Flamenco.Packaging\Flamenco.Packaging.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Flamenco.Console.UnitTests" />
+  </ItemGroup>
+
 </Project>

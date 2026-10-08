@@ -19,6 +19,7 @@ public static class Program
         var rootCommand = new RootCommand(description: "Provides tooling for maintainers of .NET Ubuntu packages.")
         {
             new PackCommand(),
+            new PrepareReleaseCommand(),
             new StatusCommand()
         };
 

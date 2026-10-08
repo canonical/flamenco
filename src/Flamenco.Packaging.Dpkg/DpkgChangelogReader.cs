@@ -379,7 +379,7 @@ public sealed class DpkgChangelogReader(TextReader textReader, Location location
         MaintainerInfo Maintainer,
         DateTimeOffset Date)
     {
-        const string DateFormat = "ddd, dd MMM yyyy HH':'mm':'ss zzz";
+        const string DateFormat = ChangelogEntry.DateFormat;
     
         static readonly Regex Pattern = new Regex(
             pattern: @"\A -- (?<Name>\S+(?: \S+)*) (?:<(?<Email>.+)>)  (?<Date>.+)\z",
