@@ -307,7 +307,10 @@ public partial class PrepareReleaseCommand : Command
             var entry = new ChangelogEntry(
                 PackageName: previousEntry.PackageName,
                 Version: version,
-                Distributions: previousEntry.Distributions,
+                Distributions: DeriveDistributions(
+                    previousEntry.Distributions,
+                    version,
+                    isDevelopmentSeries: IsDevelopmentSeries(ubuntuRelease, today)),
                 // A new upstream release is never a binary-only rebuild.
                 Metadata: previousEntry.Metadata.Remove(key: "binary-only"),
                 Description: BuildDescription(disclosures),
@@ -434,6 +437,52 @@ public partial class PrepareReleaseCommand : Command
         if (line.Length > prefixLength) lines.Add(line.ToString());
 
         return lines;
+    }
+
+    /// <summary>
+    /// Determines whether an Ubuntu series is still in development on <paramref name="today"/>.
+    /// </summary>
+    /// <remarks>
+    /// A series is in development until its release date (from distro-info). On the release day
+    /// itself it is considered released.
+    /// </remarks>
+    internal static bool IsDevelopmentSeries(UbuntuRelease release, DateOnly today) =>
+        release.Released > today;
+
+    /// <summary>
+    /// Determines whether a version is destined for a PPA rather than the primary Ubuntu archive.
+    /// </summary>
+    /// <remarks>
+    /// PPA builds carry a <c>~ppaN</c> segment in their revision, for example <c>0ubuntu1~24.04.1~ppa1</c>.
+    /// </remarks>
+    internal static bool IsPpaVersion(DpkgVersion version) =>
+        version.Revision is not null &&
+        version.Revision.Contains("~ppa", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Derives the target distributions of a servicing release from the previous changelog entry.
+    /// </summary>
+    /// <remarks>
+    /// A servicing release fixes CVEs, so uploads of a stable series to the primary archive must
+    /// target the security pocket (for example <c>resolute-security</c>), even if the previous entry
+    /// was a regular upload to the release pocket (for example an autopkgtest fix).
+    /// <para/>
+    /// Uploads to a PPA, or to a series that is still in development, always target the release
+    /// pocket (for example <c>stonking</c>): PPAs have no pockets, and a development series has no
+    /// security pocket yet.
+    /// </remarks>
+    internal static ImmutableArray<DpkgSuite> DeriveDistributions(
+        ImmutableArray<DpkgSuite> previousDistributions,
+        DpkgVersion version,
+        bool isDevelopmentSeries)
+    {
+        var pocket = IsPpaVersion(version) || isDevelopmentSeries
+            ? UbuntuPockets.Release
+            : UbuntuPockets.Security;
+
+        return [.. previousDistributions
+            .Select(suite => suite with { Pocket = pocket })
+            .Distinct()];
     }
 
     internal static bool AffectsLinux(Disclosure disclosure) =>
