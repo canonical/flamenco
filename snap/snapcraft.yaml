@@ -74,6 +74,19 @@ parts:
       - git
       - make
 
+  # Works around snapd denying openat2 with EPERM, which breaks tar extraction (see noopenat2.c).
+  noopenat2:
+    plugin: nil
+    source: snap/local/noopenat2
+    build-packages:
+      - gcc
+      - libc6-dev
+    override-build: |
+      mkdir -p "$CRAFT_PART_INSTALL"/usr/lib/flamenco
+      gcc -shared -fPIC -O2 -Wall -Wextra -Werror \
+        -o "$CRAFT_PART_INSTALL"/usr/lib/flamenco/libnoopenat2.so \
+        noopenat2.c -ldl
+
 layout:
   /etc/dpkg:
     bind: $SNAP_COMMON/dpkg
@@ -101,6 +114,8 @@ apps:
     environment:
       DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "1"
       X_DEBIAN_MULTIARCH_TRIPLET: $CRAFT_ARCH_TRIPLET_BUILD_FOR
+      # Inherited by tar and dpkg-source child processes; see snap/local/noopenat2/noopenat2.c.
+      LD_PRELOAD: $SNAP/usr/lib/flamenco/libnoopenat2.so
     command: usr/lib/flamenco/flamenco
     extensions: [ dotnet8 ]
     plugs:
