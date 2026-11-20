@@ -429,14 +429,16 @@ public class DebianSourcePackageBuilder
         {
             if (!sourceFileIndex.TryGetValue("series", out var seriesFile))
             {
-                if (destinationDirectory.Exists) destinationDirectory.Delete();
+                // Recursive: an external source may already have filled this output directory.
+                if (destinationDirectory.Exists) destinationDirectory.Delete(recursive: true);
                 return result.WithAnnotation(new CouldNotFindPatchesSeriesFile(BuildTarget));
             }
 
             result = result.Merge(CopyFile(
                 sourceFile: seriesFile.FileInfo,
                 destinationDirectory: destinationDirectory,
-                fileName: "series"));
+                fileName: "series",
+                overwrite: true));
 
             if (result.IsFailure) return result;
 
@@ -498,7 +500,8 @@ public class DebianSourcePackageBuilder
                     result = result.Merge(CopyFile(
                         sourceFile: patchFile.FileInfo,
                         destinationDirectory: destinationDirectory,
-                        fileName: patchFilePath));
+                        fileName: patchFilePath,
+                        overwrite: true));
                 }
             }
         }
