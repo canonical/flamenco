@@ -205,9 +205,15 @@ public class DebianSourcePackageBuilder
     private async Task<Result> RecursivelyCopyMatchingFilesAsync(
         DirectoryInfo sourceDirectory,
         DirectoryInfo destinationDirectory,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool isSubdirectory = false)
     {
-        return await CreateDestinationDirectory(destinationDirectory, cancellationToken)
+        // The root is verified empty, so an existing subdirectory can only come from an external source: merge into it.
+        var createResult = isSubdirectory && destinationDirectory.Exists
+            ? Result.Success
+            : CreateDestinationDirectory(destinationDirectory, cancellationToken);
+
+        return await createResult
             .Then(() => IndexSourceFiles(sourceDirectory, cancellationToken))
             .Then(sourceFileIndex => CopySourceFilesToDestinationDirectoryAsync(
                 sourceDirectory,
@@ -225,7 +231,8 @@ public class DebianSourcePackageBuilder
                     copyTasks.Add(RecursivelyCopyMatchingFilesAsync(
                         sourceDirectory: sourceSubDirectory,
                         destinationDirectory: new DirectoryInfo(destinationSubDirectoryPath),
-                        cancellationToken));
+                        cancellationToken,
+                        isSubdirectory: true));
                 }
 
                 return Result.Success.MergeWhenAll(copyTasks);
@@ -497,7 +504,8 @@ public class DebianSourcePackageBuilder
         }
         else
         {
-            foreach (var (fileName, fileInfo) in sourceFileIndex)
+            // The flamenco file (external source) goes first so local files deterministically override repo files.
+            foreach (var (fileName, fileInfo) in sourceFileIndex.OrderByDescending(e => e.Value.IsFlamencoFile))
             {
                 if (cancellationToken.IsCancellationRequested) return result.WithAnnotation(new OperationCanceled());
 
@@ -507,9 +515,10 @@ public class DebianSourcePackageBuilder
                 }
                 else
                 {
-                    result = result.Merge(CopyFile(fileInfo.FileInfo, destinationDirectory, fileName));
-                                    if (result.IsFailure) return result;
+                    result = result.Merge(CopyFile(fileInfo.FileInfo, destinationDirectory, fileName, overwrite: true));
                 }
+
+                if (result.IsFailure) return result;
             }
         }
 
@@ -521,25 +530,24 @@ public class DebianSourcePackageBuilder
     {
         var result = Result.Success;
 
-        JsonNode? jsonNode;
+        string? type;
+        Result<ExternalSources.ExternalSourceBase> externalSourceResult = default;
 
         try
         {
-            jsonNode = JsonNode.Parse(await File.ReadAllTextAsync(fileInfo.FileInfo.FullName, cancellationToken));
+            var jsonNode = JsonNode.Parse(await File.ReadAllTextAsync(fileInfo.FileInfo.FullName, cancellationToken));
+            type = jsonNode?["type"]?.GetValue<string>();
+            if (type == "external_source") externalSourceResult = ExternalSources.ExternalSourceBase.Parse(jsonNode!);
         }
-        catch (JsonException ex)
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException)
         {
             return result.WithAnnotation(new InvalidFlamencoFileContent(fileInfo.FileInfo.FullName, ex));
         }
-
-        var type = jsonNode?["type"]?.GetValue<string>();
 
         switch (type)
         {
             case "external_source":
                 var cacheDirectory = Directory.CreateDirectory(Path.Combine(DestinationDirectory.FullName, "cache"));
-
-                var externalSourceResult = ExternalSources.ExternalSourceBase.Parse(jsonNode!);
 
                 if (externalSourceResult.IsFailure)
                     return result.Merge(externalSourceResult);
@@ -564,13 +572,13 @@ public class DebianSourcePackageBuilder
         return relativePath.Equals("patches");
     }
 
-    private Result CopyFile(FileInfo sourceFile, DirectoryInfo destinationDirectory, string fileName)
+    private Result CopyFile(FileInfo sourceFile, DirectoryInfo destinationDirectory, string fileName, bool overwrite = false)
     {
         var destinationPath = Path.Combine(destinationDirectory.FullName, fileName);
 
         try
         {
-            sourceFile.CopyTo(destinationPath);
+            sourceFile.CopyTo(destinationPath, overwrite);
             return Result.Success;
         }
         catch (Exception exception)
