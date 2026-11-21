@@ -1,6 +1,9 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using LibGit2Sharp;
 
 namespace Flamenco.Packaging.ExternalSources;
@@ -31,9 +34,9 @@ public class GitExternalSource(
 
         if (cancellationToken.IsCancellationRequested) return result.WithAnnotation(new OperationCanceled());
 
-        // We use both the repository URL and the commitish to create a unique cache directory for each specific state
-        // of the repository.
-        var repoCacheDirName = $"{destinationDirectory.Name}@{Commitish ?? "default"}";
+        // Key on everything that shapes the cached tree, so distinct descriptors never share a cache entry.
+        var descriptor = JsonSerializer.Serialize(new { Repository, Commitish, PostCloneCommands, IgnoredFiles });
+        var repoCacheDirName = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(descriptor)));
         var repositoryCacheDir =
             new DirectoryInfo(Path.Join(cacheDirectory.FullName, "git", repoCacheDirName));
 
@@ -45,44 +48,24 @@ public class GitExternalSource(
         {
             if (!repositoryCacheDir.Exists)
             {
-                repositoryCacheDir.Create();
+                // Build in a temp dir and move into place only on success, so failures never leave a reusable entry.
+                var tempDir = new DirectoryInfo($"{repositoryCacheDir.FullName}.{Guid.NewGuid():N}.tmp");
                 try
                 {
-                    await Task.Run(() =>
-                    {
-                        LibGit2Sharp.Repository.Clone(Repository, repositoryCacheDir.FullName);
-
-                        if (string.IsNullOrEmpty(Commitish)) return;
-
-                        using var repo = new Repository(repositoryCacheDir.FullName);
-                        Commands.Checkout(repo, Commitish);
-                    }, cancellationToken);
+                    var prepareResult = await PrepareCacheDirectory(tempDir, cancellationToken);
+                    if (prepareResult.IsFailure) return prepareResult;
+                    Directory.Move(tempDir.FullName, repositoryCacheDir.FullName);
+                }
+                catch (IOException) when (Directory.Exists(repositoryCacheDir.FullName))
+                {
                 }
                 catch (OperationCanceledException)
                 {
                     return result.WithAnnotation(new OperationCanceled());
                 }
-                catch (Exception ex)
+                finally
                 {
-                    return new GitCloneFailed(Repository, Commitish, ex);
-                }
-
-                var postCloneResult = await RunPostCloneCommands(repositoryCacheDir, cancellationToken);
-                if (postCloneResult.IsFailure)
-                {
-                    return postCloneResult;
-                }
-
-                var deletionResult = DeleteIgnoredFiles(repositoryCacheDir, cancellationToken);
-                if (deletionResult.IsFailure)
-                {
-                    return deletionResult;
-                }
-
-                var gitDir = Path.Join(repositoryCacheDir.FullName, ".git");
-                if (Directory.Exists(gitDir))
-                {
-                    Directory.Delete(gitDir, recursive: true);
+                    if (Directory.Exists(tempDir.FullName)) Directory.Delete(tempDir.FullName, recursive: true);
                 }
             }
         }
@@ -119,6 +102,37 @@ public class GitExternalSource(
         }
 
         return result;
+    }
+
+    private async Task<Result> PrepareCacheDirectory(DirectoryInfo directory, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Run(() =>
+            {
+                LibGit2Sharp.Repository.Clone(Repository, directory.FullName);
+
+                if (string.IsNullOrEmpty(Commitish)) return;
+
+                using var repo = new Repository(directory.FullName);
+                Commands.Checkout(repo, Commitish);
+            }, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return new GitCloneFailed(Repository, Commitish, ex);
+        }
+
+        var postCloneResult = await RunPostCloneCommands(directory, cancellationToken);
+        if (postCloneResult.IsFailure) return postCloneResult;
+
+        var deletionResult = DeleteIgnoredFiles(directory, cancellationToken);
+        if (deletionResult.IsFailure) return deletionResult;
+
+        var gitDir = Path.Join(directory.FullName, ".git");
+        if (Directory.Exists(gitDir)) Directory.Delete(gitDir, recursive: true);
+
+        return Result.Success;
     }
 
     private async Task<Result> RunPostCloneCommands(DirectoryInfo workingDirectory, CancellationToken cancellationToken)
