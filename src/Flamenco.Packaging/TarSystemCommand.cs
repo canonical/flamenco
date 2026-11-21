@@ -105,14 +105,17 @@ public class TarSystemCommand : ITarArchivingServiceProvider
     {
         var result = new Result();
         var tarProcessInfo = new ProcessStartInfo(
-            fileName: "/usr/bin/env", 
-            arguments: arguments.Prepend("tar"))
+            fileName: "/usr/bin/tar")
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
             CreateNoWindow = true,
         };
+        foreach (var argument in arguments)
+        {
+            tarProcessInfo.ArgumentList.Add(argument);
+        }
         
         using var tarProcess = new Process();
         var standardOutput = new StringBuilder();

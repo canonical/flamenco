@@ -79,7 +79,7 @@ jobs:
         env:
           SNAPCRAFT_ENABLE_EXPERIMENTAL_EXTENSIONS: "1"
         with:
-          snapcraft-channel: latest/edge
+          snapcraft-channel: latest/stable
           snapcraft-args: --verbose
       - name: upload snap to workflow artifacts
         id: upload-artifact
