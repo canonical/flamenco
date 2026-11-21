@@ -101,7 +101,7 @@ public class UbuntuDistroInfoSourceGenerator : IIncrementalGenerator
             
             row.TryGetValue("eol-esm", out var eolEsm);
 
-            string name = codename.Replace(" ", "");
+            string name = codename.Replace(" ", "").Replace("-", "");
             names.Add(name);
 
             stringBuilder.Clear();
