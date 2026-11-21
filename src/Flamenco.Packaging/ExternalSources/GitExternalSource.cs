@@ -49,13 +49,15 @@ public class GitExternalSource(
             if (!repositoryCacheDir.Exists)
             {
                 // Build in a temp dir and move into place only on success, so failures never leave a reusable entry.
-                var tempDir = new DirectoryInfo(repositoryCacheDir.FullName + ".tmp");
-                if (tempDir.Exists) tempDir.Delete(recursive: true);
+                var tempDir = new DirectoryInfo($"{repositoryCacheDir.FullName}.{Guid.NewGuid():N}.tmp");
                 try
                 {
                     var prepareResult = await PrepareCacheDirectory(tempDir, cancellationToken);
                     if (prepareResult.IsFailure) return prepareResult;
                     Directory.Move(tempDir.FullName, repositoryCacheDir.FullName);
+                }
+                catch (IOException) when (Directory.Exists(repositoryCacheDir.FullName))
+                {
                 }
                 catch (OperationCanceledException)
                 {

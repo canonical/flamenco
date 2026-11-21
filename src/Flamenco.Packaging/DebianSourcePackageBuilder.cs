@@ -550,7 +550,10 @@ public class DebianSourcePackageBuilder
         switch (type)
         {
             case "external_source":
-                var cacheDirectory = Directory.CreateDirectory(Path.Combine(DestinationDirectory.FullName, "cache"));
+                var cacheDirectory = Directory.CreateDirectory(Path.Combine(
+                    Environment.GetEnvironmentVariable("SNAP_USER_COMMON")
+                    ?? throw new InvalidOperationException("SNAP_USER_COMMON is not set; flamenco must run as a snap."),
+                    "cache"));
 
                 if (externalSourceResult.IsFailure)
                     return result.Merge(externalSourceResult);
